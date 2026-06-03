@@ -69,6 +69,50 @@
 
   <div id="app" class="w-full max-w-[480px] h-[100dvh] flex flex-col bg-white relative overflow-hidden shadow-lg">
 
+    <!-- ==================== 欢迎弹窗（首次未设置 API） ==================== -->
+    <template v-if="state.showWelcomeModal">
+      <div class="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-[340px] shadow-xl modal-enter overflow-hidden">
+          <div class="px-5 py-4">
+            <div class="text-center mb-3">
+              <div class="text-3xl mb-2">🎓</div>
+              <div class="font-semibold text-text-dark text-base">欢迎使用英语学习助手</div>
+              <div class="text-xs text-gray-400 mt-1">面向 CET-6 和考研英语一的 AI 学习工具</div>
+            </div>
+            <div class="bg-gray-50 rounded-xl px-3.5 py-3 text-xs leading-relaxed space-y-2 mb-4">
+              <div class="flex items-start gap-2">
+                <span class="flex-shrink-0 mt-0.5">📚</span>
+                <span><span class="font-medium text-text-dark">六级 & 考研</span><span class="text-gray-500"> — 顶部栏一键切换，数据完全隔离</span></span>
+              </div>
+              <div class="flex items-start gap-2">
+                <span class="flex-shrink-0 mt-0.5">📖</span>
+                <span><span class="font-medium text-text-dark">词汇查询</span><span class="text-gray-500"> — 释义 / 频率 / 例句 / 辨析 / 高级替换</span></span>
+              </div>
+              <div class="flex items-start gap-2">
+                <span class="flex-shrink-0 mt-0.5">🈂️</span>
+                <span><span class="font-medium text-text-dark">翻译训练</span><span class="text-gray-500"> — 中译英 & 英译中，交互批改 + 段落精读</span></span>
+              </div>
+              <div class="flex items-start gap-2">
+                <span class="flex-shrink-0 mt-0.5">📝</span>
+                <span><span class="font-medium text-text-dark">作文辅助</span><span class="text-gray-500"> — 题目分析 → 批改 / 双版模板，考研支持 🖼️ 拍照识图</span></span>
+              </div>
+              <div class="flex items-start gap-2">
+                <span class="flex-shrink-0 mt-0.5">📂</span>
+                <span><span class="font-medium text-text-dark">文件夹管理</span><span class="text-gray-500"> — 按真题篇目分类存放记录</span></span>
+              </div>
+            </div>
+            <div class="bg-blue-50 rounded-lg px-3 py-2 text-xs text-gray-600 mb-4">
+              🔧 基于 <span class="font-medium">DeepSeek API</span> + <span class="font-medium">通义千问 VL</span> 视觉识别
+            </div>
+            <div class="flex gap-2.5">
+              <button @click="openSettingsFromWelcome()" class="flex-1 bg-wechat-green text-text-dark text-sm font-medium rounded-lg py-2.5 hover:opacity-80 transition-opacity">⚙️ 去设置 API Key</button>
+              <button @click="state.showWelcomeModal = false" class="flex-1 border border-gray-200 text-gray-500 text-sm rounded-lg py-2.5 hover:bg-gray-50 transition-colors">稍后再说</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
     <!-- ==================== Toast 提示 ==================== -->
     <transition name="toast">
       <div v-if="state.toast.show" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-5 py-2.5 rounded-lg shadow-md text-sm font-medium no-select" :class="state.toast.type === 'success' ? 'bg-green-500 text-white' : state.toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-gray-800 text-white'">
@@ -100,7 +144,7 @@
           </button>
         </div>
         <div class="flex items-center gap-3">
-          <button @click="openSummary()" class="text-lg hover:opacity-70 transition-opacity" title="重点词汇">📊</button>
+          <button @click="openSummary()" class="text-lg hover:opacity-70 transition-opacity" title="历史记录">📊</button>
           <button @click="state.showSettings = true" class="text-lg hover:opacity-70 transition-opacity" title="设置">⚙️</button>
         </div>
       </div>
@@ -111,6 +155,25 @@
           @click="switchMode(modeKey)"
           :class="['flex-1 tab-btn text-xs py-1.5 rounded-full font-medium transition-all', state.currentMode === modeKey ? 'bg-wechat-green text-text-dark shadow-sm' : 'text-gray-500 hover:bg-gray-100']">
           {{ modeCfg.label }}
+        </button>
+      </div>
+
+      <!-- 翻译子模式切换胶囊（仅翻译模式显示） -->
+      <div v-if="state.currentMode === 'translate' || state.currentMode === 'en-to-cn'"
+        class="flex-shrink-0 bg-white px-2 py-1 border-b border-border-light flex items-center gap-1">
+        <button @click="switchTranslationSubMode('intensive-reading')"
+          :class="['flex-1 text-xs py-1.5 rounded-full font-medium transition-all',
+            state.translationSubMode === 'intensive-reading'
+              ? 'bg-purple-100 text-purple-700 shadow-sm'
+              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100']">
+          📖 阅读段落精读
+        </button>
+        <button @click="switchTranslationSubMode('analysis')"
+          :class="['flex-1 text-xs py-1.5 rounded-full font-medium transition-all',
+            state.translationSubMode === 'analysis'
+              ? 'bg-blue-100 text-blue-700 shadow-sm'
+              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100']">
+          📝 翻译题目解析
         </button>
       </div>
 
@@ -268,64 +331,303 @@
 
           <!-- 🈂️ 中译英结果气泡 -->
           <!-- 🈂️ 翻译结果气泡（中译英 / 英译中 共用模板） -->
+          <!-- 🈂️ 翻译示例结果（逐句对照：原文 → 简单版 → 进阶版） -->
           <div v-if="msg.type === 'translate-result' || msg.type === 'en-to-cn-result'" class="flex justify-start">
-            <div class="max-w-[90%] bg-white border border-border-light rounded-xl px-3.5 py-3 text-sm text-text-dark leading-relaxed shadow-sm">
-              <!-- 📝 题目解析 -->
-              <div class="pb-2.5 border-b border-gray-100" v-if="msg.content.analysis">
-                <div class="font-semibold text-text-dark mb-1">📝 题目解析</div>
-                <div v-if="msg.content.analysis.structure" class="text-gray-600 text-xs mb-1">
-                  <span class="text-gray-400">句子结构：</span>{{ msg.content.analysis.structure }}
+            <div class="max-w-[95%] bg-white border border-border-light rounded-xl px-3.5 py-3 text-sm text-text-dark leading-relaxed shadow-sm">
+              <!-- 新格式：translationPairs 逐句对照 -->
+              <template v-if="msg.content.translationPairs && msg.content.translationPairs.length > 0">
+                <div v-for="(pair, pi) in msg.content.translationPairs" :key="'tp_'+pi" class="mb-3 last:mb-0">
+                  <!-- 原文句子 -->
+                  <div class="bg-yellow-50 rounded-lg px-3 py-2 mb-2 text-sm font-medium text-text-dark">
+                    {{ pair.original }}
+                  </div>
+                  <!-- 简单版（兼容数组 basicVersions 和单对象 basic） -->
+                  <template v-if="pair.basicVersions && pair.basicVersions.length > 0">
+                    <div v-for="(bv, bvi) in pair.basicVersions" :key="'bv_'+pi+'_'+bvi" class="bg-green-50 rounded-lg px-3 py-2 mb-1.5">
+                      <div class="flex items-center gap-1 mb-0.5">
+                        <span class="text-xs text-green-600 font-medium">📗 简单拿分{{ pair.basicVersions.length > 1 ? ' '+(bvi+1) : '' }}</span>
+                        <span v-if="bv.score" class="text-xs text-gray-400">· 🏆 {{ bv.score }}</span>
+                      </div>
+                      <div class="text-text-dark text-xs leading-relaxed">{{ bv.text }}</div>
+                      <div v-if="bv.tips" class="text-gray-400 text-xs mt-0.5">{{ bv.tips }}</div>
+                    </div>
+                  </template>
+                  <template v-else-if="pair.basic">
+                    <div class="bg-green-50 rounded-lg px-3 py-2 mb-1.5">
+                      <div class="flex items-center gap-1 mb-0.5">
+                        <span class="text-xs text-green-600 font-medium">📗 简单拿分</span>
+                        <span v-if="pair.basic.score" class="text-xs text-gray-400">· 🏆 {{ pair.basic.score }}</span>
+                      </div>
+                      <div class="text-text-dark text-xs leading-relaxed">{{ pair.basic.text }}</div>
+                      <div v-if="pair.basic.tips" class="text-gray-400 text-xs mt-0.5">{{ pair.basic.tips }}</div>
+                    </div>
+                  </template>
+                  <!-- 进阶版（兼容数组 advancedVersions 和单对象 advanced） -->
+                  <template v-if="pair.advancedVersions && pair.advancedVersions.length > 0">
+                    <div v-for="(av, avi) in pair.advancedVersions" :key="'av_'+pi+'_'+avi" class="bg-blue-50 rounded-lg px-3 py-2 mb-1.5 last:mb-0">
+                      <div class="flex items-center gap-1 mb-0.5">
+                        <span class="text-xs text-blue-500 font-medium">📘 进阶高分{{ pair.advancedVersions.length > 1 ? ' '+(avi+1) : '' }}</span>
+                      </div>
+                      <div class="text-text-dark text-xs leading-relaxed">{{ av.text }}</div>
+                      <div v-if="av.highlights && av.highlights.length > 0" class="mt-1">
+                        <div class="text-xs text-gray-400 mb-0.5">✨ 亮点：</div>
+                        <div v-for="(h, hi) in av.highlights" :key="'hl_'+pi+'_'+avi+'_'+hi" class="text-xs text-gray-600 ml-2">• {{ h }}</div>
+                      </div>
+                      <div v-if="av.knowledgePoints && av.knowledgePoints.length > 0" class="mt-1">
+                        <div class="text-xs text-gray-400 mb-0.5">📚 知识点：</div>
+                        <div v-for="(k, ki) in av.knowledgePoints" :key="'kp_'+pi+'_'+avi+'_'+ki" class="text-xs text-gray-600 ml-2">• {{ k }}</div>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else-if="pair.advanced">
+                    <div class="bg-blue-50 rounded-lg px-3 py-2">
+                      <div class="flex items-center gap-1 mb-0.5">
+                        <span class="text-xs text-blue-500 font-medium">📘 进阶高分</span>
+                      </div>
+                      <div class="text-text-dark text-xs leading-relaxed">{{ pair.advanced.text }}</div>
+                      <div v-if="pair.advanced.highlights && pair.advanced.highlights.length > 0" class="mt-1">
+                        <div class="text-xs text-gray-400 mb-0.5">✨ 亮点：</div>
+                        <div v-for="(h, hi) in pair.advanced.highlights" :key="'hl_'+pi+'_'+hi" class="text-xs text-gray-600 ml-2">• {{ h }}</div>
+                      </div>
+                      <div v-if="pair.advanced.knowledgePoints && pair.advanced.knowledgePoints.length > 0" class="mt-1">
+                        <div class="text-xs text-gray-400 mb-0.5">📚 知识点：</div>
+                        <div v-for="(k, ki) in pair.advanced.knowledgePoints" :key="'kp_'+pi+'_'+ki" class="text-xs text-gray-600 ml-2">• {{ k }}</div>
+                      </div>
+                    </div>
+                  </template>
                 </div>
-                <div v-if="msg.content.analysis.approach" class="text-gray-600 text-xs">
-                  <span class="text-gray-400">翻译思路：</span>{{ msg.content.analysis.approach }}
+              </template>
+              <!-- 兼容旧格式 -->
+              <template v-else>
+                <div class="pb-2.5 border-b border-gray-100" v-if="msg.content.analysis">
+                  <div class="font-semibold text-text-dark mb-1">📝 题目解析</div>
+                  <div v-if="msg.content.analysis.structure" class="text-gray-600 text-xs mb-1">
+                    <span class="text-gray-400">句子结构：</span>{{ msg.content.analysis.structure }}
+                  </div>
+                  <div v-if="msg.content.analysis.approach" class="text-gray-600 text-xs">
+                    <span class="text-gray-400">翻译思路：</span>{{ msg.content.analysis.approach }}
+                  </div>
+                </div>
+                <div class="py-2.5 border-b border-gray-100" v-if="msg.content.basicVersions && msg.content.basicVersions.length > 0">
+                  <div class="font-semibold text-text-dark mb-2">📗 简单拿分版</div>
+                  <div v-for="(v, vi) in msg.content.basicVersions" :key="'bv_'+vi" class="mb-2.5 last:mb-0 bg-green-50 rounded-lg px-3 py-2">
+                    <div class="font-medium text-text-dark text-sm">{{ v.en || v.zh }}</div>
+                    <div class="text-xs text-gray-400 mt-1">
+                      <span v-if="v.score">🏆 {{ v.score }} · </span>
+                      <span>{{ v.tips }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="pt-2.5" v-if="msg.content.advancedVersions && msg.content.advancedVersions.length > 0">
+                  <div class="font-semibold text-text-dark mb-2">📘 进阶高分版</div>
+                  <div v-for="(v, vi) in msg.content.advancedVersions" :key="'av_'+vi" class="mb-2.5 last:mb-0 bg-blue-50 rounded-lg px-3 py-2">
+                    <div class="font-medium text-text-dark text-sm">{{ v.en || v.zh }}</div>
+                    <div v-if="v.highlights && v.highlights.length > 0" class="mt-1.5">
+                      <div class="text-xs text-gray-400 mb-0.5">✨ 亮点：</div>
+                      <div v-for="(h, hi) in v.highlights" :key="'hl_'+hi" class="text-xs text-gray-600 ml-2">• {{ h }}</div>
+                    </div>
+                    <div v-if="v.knowledgePoints && v.knowledgePoints.length > 0" class="mt-1">
+                      <div class="text-xs text-gray-400 mb-0.5">📚 知识点：</div>
+                      <div v-for="(k, ki) in v.knowledgePoints" :key="'kp_'+ki" class="text-xs text-gray-600 ml-2">• {{ k }}</div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="msg.content.historyNote" class="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-400">
+                  {{ msg.content.historyNote }}
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 📖 精读分析结果卡片（阅读段落精读模式） -->
+          <div v-if="msg.type === 'intensive-reading-result'" class="flex justify-start">
+            <div class="max-w-[95%] bg-white border border-border-light rounded-xl px-3.5 py-3 text-sm text-text-dark leading-relaxed shadow-sm">
+
+              <!-- 1. 全文翻译 -->
+              <div class="pb-2.5 border-b border-gray-100">
+                <div class="font-semibold text-text-dark mb-2">📖 全文翻译</div>
+                <div class="bg-yellow-50 rounded-lg px-3 py-2 text-sm leading-relaxed text-gray-800">
+                  {{ msg.content.fullTranslation }}
                 </div>
               </div>
 
-              <!-- 📗 简单拿分版 -->
-              <div class="py-2.5 border-b border-gray-100" v-if="msg.content.basicVersions && msg.content.basicVersions.length > 0">
-                <div class="font-semibold text-text-dark mb-2">📗 简单拿分版</div>
-                <div v-for="(v, vi) in msg.content.basicVersions" :key="'bv_'+vi" class="mb-2.5 last:mb-0 bg-green-50 rounded-lg px-3 py-2">
-                  <div class="font-medium text-text-dark text-sm">{{ v.en || v.zh }}</div>
-                  <div class="text-xs text-gray-400 mt-1">
-                    <span v-if="v.score">🏆 {{ v.score }} · </span>
-                    <span>{{ v.tips }}</span>
+              <!-- 2. 逐句对照 -->
+              <div class="py-2.5 border-b border-gray-100">
+                <div class="font-semibold text-text-dark mb-2">📝 逐句对照</div>
+                <div v-if="msg.content.sentenceAnalysis && msg.content.sentenceAnalysis.length > 0">
+                  <div v-for="(sa, si) in msg.content.sentenceAnalysis" :key="'sa_'+si"
+                       class="mb-2.5 last:mb-0 bg-gray-50 rounded-lg px-3 py-2">
+                    <div class="flex items-start gap-2">
+                      <span class="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex items-center justify-center mt-0.5">{{ si + 1 }}</span>
+                      <div class="flex-1 min-w-0">
+                        <div class="text-text-dark text-sm font-medium mb-1">{{ sa.original }}</div>
+                        <div class="text-gray-600 text-xs leading-relaxed mb-1">{{ sa.translation }}</div>
+                        <div class="text-gray-400 text-xs"><span class="text-gray-500">句式：</span>{{ sa.structure }}</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
+                <div v-else class="text-gray-400 text-xs">暂无逐句对照数据</div>
               </div>
 
-              <!-- 📘 进阶高分版 -->
-              <div class="pt-2.5" v-if="msg.content.advancedVersions && msg.content.advancedVersions.length > 0">
-                <div class="font-semibold text-text-dark mb-2">📘 进阶高分版</div>
-                <div v-for="(v, vi) in msg.content.advancedVersions" :key="'av_'+vi" class="mb-2.5 last:mb-0 bg-blue-50 rounded-lg px-3 py-2">
-                  <div class="font-medium text-text-dark text-sm">{{ v.en || v.zh }}</div>
-                  <div v-if="v.highlights && v.highlights.length > 0" class="mt-1.5">
-                    <div class="text-xs text-gray-400 mb-0.5">✨ 亮点：</div>
-                    <div v-for="(h, hi) in v.highlights" :key="'hl_'+hi" class="text-xs text-gray-600 ml-2">• {{ h }}</div>
-                  </div>
-                  <div v-if="v.knowledgePoints && v.knowledgePoints.length > 0" class="mt-1">
-                    <div class="text-xs text-gray-400 mb-0.5">📚 知识点：</div>
-                    <div v-for="(k, ki) in v.knowledgePoints" :key="'kp_'+ki" class="text-xs text-gray-600 ml-2">• {{ k }}</div>
+              <!-- 3. 核心词汇表 -->
+              <div class="py-2.5 border-b border-gray-100">
+                <div class="font-semibold text-text-dark mb-2">🔑 核心词汇</div>
+                <div v-if="msg.content.keyVocabulary && msg.content.keyVocabulary.length > 0">
+                  <div v-for="(kv, ki) in msg.content.keyVocabulary" :key="'kv_'+ki"
+                       class="flex items-start gap-2 mb-2 last:mb-0">
+                    <span class="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-600 text-xs font-bold flex items-center justify-center mt-0.5">{{ ki + 1 }}</span>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="font-semibold text-text-dark text-sm">{{ kv.word }}</span>
+                        <span v-if="kv.pos" class="text-gray-400 text-xs">({{ kv.pos }})</span>
+                        <span v-if="kv.pronunciation" class="text-gray-400 text-xs">{{ kv.pronunciation }}</span>
+                      </div>
+                      <div class="text-gray-700 text-xs mt-0.5">{{ kv.meaning }}</div>
+                      <div v-if="kv.example" class="text-gray-400 text-xs mt-0.5 italic">{{ kv.example }}</div>
+                    </div>
                   </div>
                 </div>
+                <div v-else class="text-gray-400 text-xs">暂无核心词汇数据</div>
               </div>
 
-              <!-- 学习记录 -->
+              <!-- 4. 长难句精析 -->
+              <div class="pt-2.5">
+                <div class="font-semibold text-text-dark mb-2">🔬 长难句精析</div>
+                <div v-if="msg.content.difficultSentences && msg.content.difficultSentences.length > 0">
+                  <div v-for="(ds, di) in msg.content.difficultSentences" :key="'ds_'+di"
+                       class="mb-2.5 last:mb-0 bg-red-50 rounded-lg px-3 py-2">
+                    <div class="flex items-start gap-2">
+                      <span class="flex-shrink-0 w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs font-bold flex items-center justify-center mt-0.5">{{ di + 1 }}</span>
+                      <div class="flex-1 min-w-0">
+                        <div class="text-text-dark text-sm font-medium mb-1">{{ ds.sentence }}</div>
+                        <div class="text-gray-600 text-xs leading-relaxed mb-1 whitespace-pre-wrap">{{ ds.analysis }}</div>
+                        <div class="bg-white rounded-lg px-2 py-1.5 text-xs text-gray-700 border border-red-100">
+                          <span class="text-gray-400 font-medium">译文：</span>{{ ds.translation }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="text-gray-400 text-xs">该段无特别复杂的长难句</div>
+              </div>
+
+              <!-- 历史提示 -->
               <div v-if="msg.content.historyNote" class="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-400">
                 {{ msg.content.historyNote }}
               </div>
             </div>
           </div>
 
+          <!-- 📝 翻译解析卡片（含操作选择：批改 / 直接生成） -->
+          <div v-if="msg.type === 'translate-analysis'" class="flex justify-start">
+            <div class="max-w-[90%] bg-white border border-border-light rounded-xl px-3.5 py-3 text-sm text-text-dark leading-relaxed shadow-sm">
+              <!-- 解析：分段展示（每段自带原文，不再额外显示全文） -->
+              <div class="pb-2.5 border-b border-gray-100" v-if="msg.content.analysis">
+                <div class="font-semibold text-text-dark mb-2">📝 题目解析</div>
+                <!-- 新格式：分段数组 -->
+                <template v-if="msg.content.analysis.segments && msg.content.analysis.segments.length > 0">
+                  <div v-for="(seg, si) in msg.content.analysis.segments" :key="'seg_'+si" class="mb-2 last:mb-0 bg-gray-50 rounded-lg px-3 py-2">
+                    <div class="font-medium text-text-dark text-xs mb-1">{{ seg.original }}</div>
+                    <div v-if="seg.structure" class="text-gray-600 text-xs mb-0.5">
+                      <span class="text-gray-400">结构：</span>{{ seg.structure }}
+                    </div>
+                    <div v-if="seg.approach" class="text-gray-600 text-xs">
+                      <span class="text-gray-400">要点：</span>{{ seg.approach }}
+                    </div>
+                  </div>
+                </template>
+                <!-- 兼容旧格式：单段文字 -->
+                <template v-else>
+                  <div v-if="msg.content.analysis.structure" class="text-gray-600 text-xs mb-1">
+                    <span class="text-gray-400">句子结构：</span>{{ msg.content.analysis.structure }}
+                  </div>
+                  <div v-if="msg.content.analysis.approach" class="text-gray-600 text-xs">
+                    <span class="text-gray-400">翻译思路：</span>{{ msg.content.analysis.approach }}
+                  </div>
+                </template>
+              </div>
+
+              <!-- 操作按钮 -->
+              <div v-if="state.translateContext && !state.postAnalysisAction" class="mt-3 flex gap-2">
+                <button @click="choosePostAnalysisAction('grade')" class="flex-1 bg-cet-orange text-white text-xs font-medium rounded-lg py-2.5 hover:bg-orange-600 transition-colors active:scale-[0.98]">
+                  📝 批改我的翻译
+                </button>
+                <button @click="choosePostAnalysisAction('generate')" class="flex-1 bg-green-500 text-white text-xs font-medium rounded-lg py-2.5 hover:bg-green-600 transition-colors active:scale-[0.98]">
+                  📖 查看示例译文
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- 📝 考研大作文结构化描述表单（入口直接显示） -->
+          <div v-if="msg.type === 'long-essay-form'" class="flex justify-start">
+            <div class="max-w-[95%] bg-white border border-border-light rounded-xl px-3.5 py-3 text-sm text-text-dark leading-relaxed shadow-sm">
+              <div class="font-semibold text-text-dark mb-2">📸 请描述图画/图表内容</div>
+              <div class="text-xs text-gray-400 mb-3">拍照或手动填写以下信息，帮助 AI 准确理解题目</div>
+
+              <!-- 类型选择 -->
+              <div class="flex items-center gap-1.5 mb-3">
+                <button @click="state.essayFormData.longEssayType = 'picture'"
+                  :class="['flex-1 text-xs py-1.5 rounded-full font-medium transition-all',
+                    state.essayFormData.longEssayType === 'picture' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100']">
+                  🎨 图画
+                </button>
+                <button @click="state.essayFormData.longEssayType = 'chart'"
+                  :class="['flex-1 text-xs py-1.5 rounded-full font-medium transition-all',
+                    state.essayFormData.longEssayType === 'chart' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100']">
+                  📊 图表
+                </button>
+              </div>
+
+              <!-- 🖼️ 拍照识图按钮 -->
+              <button @click="openEssayCamera()" :disabled="state.isOcrProcessing"
+                class="w-full mb-3 text-sm text-white font-medium rounded-lg py-2 transition-colors active:scale-[0.98] disabled:opacity-50"
+                :class="state.isOcrProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600'">
+                <span v-if="!state.isOcrProcessing">🖼️ 拍照识图</span>
+                <span v-else>🔍 正在分析图片...</span>
+              </button>
+
+              <!-- 图画作文字段 -->
+              <template v-if="state.essayFormData.longEssayType === 'picture'">
+                <div class="space-y-2 mb-2">
+                  <input v-model="state.essayFormData.subjects" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" placeholder="人物/主体（如：一对父子、一群学生）">
+                  <input v-model="state.essayFormData.action" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" placeholder="动作/场景（如：各看各的手机、围坐讨论）">
+                  <input v-model="state.essayFormData.meaning" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" placeholder="反映寓意（如：手机依赖导致人际疏离）">
+                </div>
+              </template>
+
+              <!-- 图表作文字段 -->
+              <template v-else>
+                <div class="space-y-2 mb-2">
+                  <input v-model="state.essayFormData.chartType" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="图表类型（柱状图/饼图/折线图/表格）">
+                  <input v-model="state.essayFormData.chartTitle" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="标题/主题（如：2020-2025年网购人数变化）">
+                  <input v-model="state.essayFormData.dataPoints" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="关键数据（如：从3亿增至9亿，年增约20%）">
+                  <input v-model="state.essayFormData.trend" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="整体趋势（如：持续上升/先升后降/逐年稳定增长）">
+                  <input v-model="state.essayFormData.phenomenon" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="反映现象（如：网购已成为主流消费方式）">
+                </div>
+              </template>
+
+              <!-- 额外说明（通用） -->
+              <div class="mb-3">
+                <textarea v-model="state.essayFormData.description" rows="3"
+                  class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-purple-400 resize-none leading-relaxed"
+                  placeholder="📝 额外说明：综合描述图画/图表全貌（拍照后自动填入，可修改）"></textarea>
+              </div>
+
+              <!-- 确认按钮 -->
+              <button @click="submitLongEssayForm()" :disabled="state.isSending"
+                class="w-full bg-wechat-green text-text-dark font-medium rounded-lg py-2.5 text-sm hover:opacity-80 transition-opacity active:scale-[0.98] disabled:opacity-50">
+                确认并开始分析
+              </button>
+            </div>
+          </div>
+
           <!-- 📝 作文题目解析气泡（六级大作文 / 考研小作文 / 考研大作文 共用） -->
           <div v-if="msg.type === 'essay-analysis' || msg.type === 'short-essay-analysis' || msg.type === 'long-essay-analysis'" class="flex justify-start">
             <div class="max-w-[90%] bg-white border border-border-light rounded-xl px-3.5 py-3 text-sm text-text-dark leading-relaxed shadow-sm">
-              <!-- 题目 -->
-              <div class="mb-2 bg-yellow-50 rounded-lg px-3 py-2 text-sm">
-                <div class="text-xs text-gray-400 mb-0.5">{{ currentModeConfig.analysisTitle || '📝 题目' }}</div>
-                <div class="font-medium text-text-dark">{{ msg.queryText }}</div>
-              </div>
-
-              <!-- 题目解析 — 按字段存在性条件渲染 -->
+              <!-- 题目解析（不再重复显示题目原文） -->
               <div v-if="msg.content.topicAnalysis" class="space-y-2">
                 <div v-if="msg.content.topicAnalysis.type" class="flex items-center gap-2 text-xs">
                   <span class="text-gray-400">类型：</span>
@@ -357,33 +659,23 @@
                 </div>
               </div>
 
-              <!-- 考研大作文：结构化图画/图表描述表单 -->
-              <div v-if="msg.type === 'long-essay-analysis' && msg.content.topicAnalysis" class="mt-3 space-y-2">
-                <!-- 图画作文表单 -->
-                <template v-if="msg.content.topicAnalysis.type && msg.content.topicAnalysis.type.includes('图画')">
-                  <div class="text-xs text-gray-500 mb-1">🎨 请描述图画内容，帮助 AI 更准确生成模板：</div>
-                  <input v-model="state.essayFormData.subjects" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="图中人物/主体（如：一对父子、一群学生）">
-                  <input v-model="state.essayFormData.action" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="他们在做什么（如：各看各的手机、围坐讨论）">
-                  <input v-model="state.essayFormData.meaning" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="反映什么寓意（如：手机依赖导致人际疏离）">
-                </template>
-                <!-- 图表作文表单 -->
-                <template v-else-if="msg.content.topicAnalysis.type && msg.content.topicAnalysis.type.includes('图表')">
-                  <div class="text-xs text-gray-500 mb-1">📊 请描述图表内容，帮助 AI 更准确生成模板：</div>
-                  <input v-model="state.essayFormData.chartType" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="图表类型（柱状图/饼图/折线图/表格）">
-                  <input v-model="state.essayFormData.chartTitle" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="图表标题/主题（如：2020-2025年网购人数变化）">
-                  <input v-model="state.essayFormData.dataPoints" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="关键数据（如：从3亿增至9亿，年增约20%）">
-                  <input v-model="state.essayFormData.trend" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="整体趋势（如：持续上升/先升后降/逐年稳定增长）">
-                  <input v-model="state.essayFormData.phenomenon" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="反映什么现象（如：网购已成为主流消费方式）">
-                </template>
-                <input v-model="state.essayFormData.extraKeywords" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="额外关键词或句式（可选，用逗号分隔）">
-                <div class="flex gap-2">
-                  <button @click="submitEssayForm('detailed')" :disabled="state.isSending" class="flex-1 bg-green-500 text-white text-xs font-medium rounded-lg py-2 hover:bg-green-600 transition-colors disabled:opacity-50">📝 详细生成</button>
-                  <button @click="submitEssayForm('skip')" :disabled="state.isSending" class="flex-1 bg-gray-300 text-gray-600 text-xs font-medium rounded-lg py-2 hover:bg-gray-400 transition-colors disabled:opacity-50">跳过</button>
-                </div>
+              <!-- 操作按钮（解析后选择） -->
+              <div v-if="state.essayContext && !state.postAnalysisAction" class="mt-3 flex gap-2">
+                <button @click="choosePostAnalysisAction('grade')" class="flex-1 bg-cet-orange text-white text-xs font-medium rounded-lg py-2.5 hover:bg-orange-600 transition-colors active:scale-[0.98]">
+                  📝 批改我的作文
+                </button>
+                <button @click="choosePostAnalysisAction('generate')" class="flex-1 bg-green-500 text-white text-xs font-medium rounded-lg py-2.5 hover:bg-green-600 transition-colors active:scale-[0.98]">
+                  📖 直接生成模板
+                </button>
               </div>
 
-              <!-- 其他作文模式：关键词引导 — 从考试配置读取 -->
-              <div v-else class="mt-3 bg-gray-50 rounded-lg px-3 py-2.5 text-xs text-gray-500" v-html="keywordGuideText"></div>
+              <!-- 考研大作文：关键词引导（由前置表单提供描述，不再重复显表单） -->
+              <div v-if="state.essayContext && state.postAnalysisAction === 'generate' && msg.type === 'long-essay-analysis'" class="mt-3 bg-gray-50 rounded-lg px-3 py-2.5 text-xs text-gray-500">
+                💡 请告诉我你想用到的关键词或句式，我会把它们融入写作模板中。<br><span class="text-gray-400" style="font-size:12px;">直接发送空内容可跳过此步骤，自动生成模板。</span>
+              </div>
+
+              <!-- 其他作文模式：关键词引导 — 仅"直接生成"时显示 -->
+              <div v-else-if="state.essayContext && state.postAnalysisAction === 'generate'" class="mt-3 bg-gray-50 rounded-lg px-3 py-2.5 text-xs text-gray-500" v-html="keywordGuideText"></div>
             </div>
           </div>
 
@@ -400,7 +692,7 @@
               <div v-if="msg.content.basicTemplate && msg.content.basicTemplate.paragraphs" class="mb-3">
                 <div class="font-semibold text-lg mb-2">📗 简单版模板</div>
                 <div v-for="(p, pi) in msg.content.basicTemplate.paragraphs" :key="'bp_'+pi" class="mb-2.5 last:mb-0 bg-green-50 rounded-lg px-3 py-2.5">
-                  <div class="text-xs text-gray-400 font-medium mb-1">{{ p.section }}</div>
+                  <div class="text-xs text-gray-400 font-medium mb-1">{{ p.section }}（{{ countWords(p.en) }} 词）</div>
                   <div class="text-text-dark text-sm leading-relaxed mb-1.5 whitespace-pre-wrap">{{ p.en }}</div>
                   <div class="text-gray-500 text-xs mb-1">「{{ p.zh }}」</div>
                   <div v-if="p.knowledge" class="text-xs text-gray-400">📚 {{ p.knowledge }}</div>
@@ -411,7 +703,7 @@
               <div v-if="msg.content.advancedTemplate && msg.content.advancedTemplate.paragraphs">
                 <div class="font-semibold text-lg mb-2">📘 进阶版模板</div>
                 <div v-for="(p, pi) in msg.content.advancedTemplate.paragraphs" :key="'ap_'+pi" class="mb-2.5 last:mb-0 bg-blue-50 rounded-lg px-3 py-2.5">
-                  <div class="text-xs text-blue-500 font-medium mb-1">{{ p.section }}</div>
+                  <div class="text-xs text-blue-500 font-medium mb-1">{{ p.section }}（{{ countWords(p.en) }} 词）</div>
                   <div class="text-text-dark text-sm leading-relaxed mb-1.5 whitespace-pre-wrap">{{ p.en }}</div>
                   <div class="text-gray-500 text-xs mb-1">「{{ p.zh }}」</div>
                   <div v-if="p.knowledge" class="text-xs text-blue-400">📚 {{ p.knowledge }}</div>
@@ -424,12 +716,132 @@
               </div>
             </div>
           </div>
+
+          <!-- 🏆 翻译批改结果气泡 -->
+          <div v-if="msg.type === 'translate-grade-result'" class="flex justify-start">
+            <div class="max-w-[90%] bg-white border border-border-light rounded-xl px-3.5 py-3 text-sm text-text-dark leading-relaxed shadow-sm">
+              <!-- 总分 -->
+              <div class="text-center mb-3 pb-3 border-b border-gray-100">
+                <div class="text-3xl font-bold" :class="msg.content.overallScore >= 80 ? 'text-green-500' : msg.content.overallScore >= 60 ? 'text-cet-orange' : 'text-red-500'">
+                  {{ msg.content.overallScore }}
+                </div>
+                <div class="text-xs text-gray-400">综合评分（百分制）</div>
+              </div>
+
+              <!-- 分维度评分 -->
+              <div v-if="msg.content.scoreBreakdown && msg.content.scoreBreakdown.length > 0" class="mb-3">
+                <div class="font-semibold text-text-dark mb-2 text-xs">📊 分维度评价</div>
+                <div v-for="(dim, di) in msg.content.scoreBreakdown" :key="'dim_'+di" class="flex items-center gap-2 mb-1.5 text-xs">
+                  <span class="text-gray-600 w-16 flex-shrink-0">{{ dim.dimension }}</span>
+                  <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div class="h-full rounded-full transition-all" :class="dim.score / dim.maxScore >= 0.8 ? 'bg-green-400' : dim.score / dim.maxScore >= 0.6 ? 'bg-yellow-400' : 'bg-red-400'" :style="{ width: (dim.score / dim.maxScore * 100) + '%' }"></div>
+                  </div>
+                  <span class="text-gray-500 w-12 text-right flex-shrink-0">{{ dim.score }}/{{ dim.maxScore }}</span>
+                </div>
+              </div>
+
+              <!-- 具体问题 -->
+              <div v-if="msg.content.issues && msg.content.issues.length > 0" class="mb-3">
+                <div class="font-semibold text-text-dark mb-2 text-xs">🔍 具体问题与修改建议</div>
+                <div v-for="(issue, ii) in msg.content.issues" :key="'is_'+ii" class="mb-2 last:mb-0 bg-red-50 rounded-lg px-3 py-2 text-xs">
+                  <div class="text-gray-400 mb-0.5">📍 {{ issue.location }}</div>
+                  <div v-if="issue.sourceText" class="text-gray-600 mb-1"><span class="text-blue-500">题目：</span>{{ issue.sourceText }}</div>
+                  <div class="text-gray-600 mb-1"><span class="text-red-500">你的译文：</span>{{ issue.original }}</div>
+                  <div class="text-gray-600 mb-1"><span class="text-cet-orange">问题：</span>{{ issue.problem }}</div>
+                  <div class="text-green-600">✨ 建议：{{ issue.suggestion }}</div>
+                </div>
+              </div>
+
+              <!-- 总体评价 -->
+              <div v-if="msg.content.overallComment" class="bg-blue-50 rounded-lg px-3 py-2 text-xs text-gray-600">
+                💬 {{ msg.content.overallComment }}
+              </div>
+
+              <!-- 修改后例文（原文→译文对照） -->
+              <div v-if="msg.content.improvedVersion" class="mt-3 pt-3 border-t border-gray-100">
+                <div class="font-semibold text-text-dark mb-2 text-xs">✨ 修改后例文</div>
+                <!-- 新格式：分段对照 -->
+                <template v-if="msg.content.improvedVersion.segments && msg.content.improvedVersion.segments.length > 0">
+                  <div v-for="(seg, si) in msg.content.improvedVersion.segments" :key="'ivs_'+si" class="mb-2 last:mb-0 bg-green-50 rounded-lg px-3 py-2">
+                    <div class="text-text-dark text-xs leading-relaxed mb-1">{{ seg.original }}</div>
+                    <div class="text-green-600 text-xs">→ {{ seg.translation }}</div>
+                  </div>
+                </template>
+                <!-- 兼容旧格式 -->
+                <template v-else>
+                  <div class="bg-green-50 rounded-lg px-3 py-2 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{{ msg.content.improvedVersion.text }}</div>
+                  <div v-if="msg.content.improvedVersion.zh" class="text-gray-400 text-xs mt-1">「{{ msg.content.improvedVersion.zh }}」</div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- 🏆 作文批改结果气泡 -->
+          <div v-if="msg.type === 'essay-grade-result'" class="flex justify-start">
+            <div class="max-w-[90%] bg-white border border-border-light rounded-xl px-3.5 py-3 text-sm text-text-dark leading-relaxed shadow-sm">
+              <!-- 总分 -->
+              <div class="text-center mb-3 pb-3 border-b border-gray-100">
+                <div class="text-3xl font-bold" :class="msg.content.overallScore >= 80 ? 'text-green-500' : msg.content.overallScore >= 60 ? 'text-cet-orange' : 'text-red-500'">
+                  {{ msg.content.overallScore }}
+                </div>
+                <div class="text-xs text-gray-400">综合评分（百分制）</div>
+              </div>
+
+              <!-- 分维度评分 -->
+              <div v-if="msg.content.scoreBreakdown && msg.content.scoreBreakdown.length > 0" class="mb-3">
+                <div class="font-semibold text-text-dark mb-2 text-xs">📊 分维度评价</div>
+                <div v-for="(dim, di) in msg.content.scoreBreakdown" :key="'edim_'+di" class="flex items-center gap-2 mb-1.5 text-xs">
+                  <span class="text-gray-600 w-16 flex-shrink-0">{{ dim.dimension }}</span>
+                  <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div class="h-full rounded-full transition-all" :class="dim.score / dim.maxScore >= 0.8 ? 'bg-green-400' : dim.score / dim.maxScore >= 0.6 ? 'bg-yellow-400' : 'bg-red-400'" :style="{ width: (dim.score / dim.maxScore * 100) + '%' }"></div>
+                  </div>
+                  <span class="text-gray-500 w-12 text-right flex-shrink-0">{{ dim.score }}/{{ dim.maxScore }}</span>
+                </div>
+              </div>
+
+              <!-- 具体问题 -->
+              <div v-if="msg.content.issues && msg.content.issues.length > 0" class="mb-3">
+                <div class="font-semibold text-text-dark mb-2 text-xs">🔍 具体问题与修改建议</div>
+                <div v-for="(issue, ii) in msg.content.issues" :key="'eis_'+ii" class="mb-2 last:mb-0 bg-red-50 rounded-lg px-3 py-2 text-xs">
+                  <div class="text-gray-400 mb-0.5">📍 {{ issue.location }}</div>
+                  <div class="text-gray-600 mb-1"><span class="text-red-500">原文：</span>{{ issue.original }}</div>
+                  <div class="text-gray-600 mb-1"><span class="text-cet-orange">问题：</span>{{ issue.problem }}</div>
+                  <div class="text-green-600">✨ 建议：{{ issue.suggestion }}</div>
+                  <div v-if="issue.suggestionZh" class="text-gray-400 text-xs mt-0.5">{{ issue.suggestionZh }}</div>
+                </div>
+              </div>
+
+              <!-- 总体评价 -->
+              <div v-if="msg.content.overallComment" class="bg-blue-50 rounded-lg px-3 py-2 text-xs text-gray-600">
+                💬 {{ msg.content.overallComment }}
+              </div>
+
+              <!-- 修改后范文（分段展示，每段附中文释义和词数） -->
+              <div v-if="msg.content.improvedVersion" class="mt-3 pt-3 border-t border-gray-100">
+                <div class="font-semibold text-text-dark mb-2 text-xs">✨ 修改后范文</div>
+                <div v-for="(p, pi) in msg.content.improvedVersion.paragraphs" :key="'ivp_'+pi" class="mb-2 last:mb-0 bg-green-50 rounded-lg px-3 py-2">
+                  <div class="text-text-dark text-xs leading-relaxed whitespace-pre-wrap mb-1">{{ p.en }}</div>
+                  <div class="text-gray-400 text-xs">「{{ p.zh }}」（{{ countWords(p.en) }} 词）</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="h-2"></div><!-- 底部留白 -->
       </div>
 
       <!-- 底部输入栏 -->
-      <div class="flex-shrink-0 bg-white border-t border-border-light px-3 py-2 flex items-center gap-2 z-10">
+      <div class="flex-shrink-0 bg-white border-t border-border-light px-3 py-2 flex items-center gap-1.5 z-10">
+        <!-- 📷 拍照识别按钮 -->
+        <button
+          @click="openCamera()"
+          :disabled="state.isSending || state.isOcrProcessing || state.currentMode === 'long-essay'"
+          :class="['flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all', (state.isSending || state.isOcrProcessing || state.currentMode === 'long-essay') ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 active:scale-95']"
+          :title="state.currentMode === 'long-essay' ? '请使用上方的🖼️拍照识图' : '拍照识别文字'"
+        >
+          <span v-if="!state.isOcrProcessing" class="text-base">📷</span>
+          <span v-else class="text-xs">🔍</span>
+        </button>
         <div class="flex-1 relative">
           <input
             v-model="state.inputText"
@@ -452,7 +864,7 @@
       </div>
     </template>
 
-    <!-- ==================== 重点词汇汇总视图 ==================== -->
+    <!-- ==================== 历史记录汇总视图 ==================== -->
     <template v-if="state.currentView === 'summary'">
       <!-- 顶部栏 -->
       <div class="flex-shrink-0 h-11 bg-white border-b border-border-light flex items-center justify-between px-3 z-10">
@@ -482,7 +894,7 @@
               <div class="text-sm mb-1">该文件夹暂无查询记录</div>
               <div class="text-xs">去查几个词吧！</div>
             </div>
-            <div v-for="(item, idx) in sortedVocabulary" :key="idx" @click="queryFromSummary(item.word)" class="bg-white rounded-xl px-4 py-3 mb-2.5 shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
+            <div v-for="(item, idx) in sortedVocabulary" :key="idx" @click="queryFromSummary(item)" class="bg-white rounded-xl px-4 py-3 mb-2.5 shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
               <div class="flex items-center justify-between mb-1">
                 <div class="flex items-center gap-2">
                   <span v-if="item.cetFrequency === '高频'" class="text-sm">🔴</span>
@@ -509,13 +921,26 @@
               <div class="text-sm mb-1">暂无翻译记录</div>
               <div class="text-xs">去翻译模式练几句吧！</div>
             </div>
-            <div v-for="(item, idx) in sortedTranslations" :key="idx" @click="queryTranslateFromSummary(item.chineseText || item.englishText)" class="bg-white rounded-xl px-4 py-3 mb-2.5 shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
+            <div v-for="(item, idx) in sortedTranslations" :key="idx" @click="queryTranslateFromSummary(item)" class="bg-white rounded-xl px-4 py-3 mb-2.5 shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
               <div class="flex items-center justify-between mb-1">
-                <span class="font-semibold text-text-dark text-sm leading-relaxed flex-1 mr-2">{{ item.chineseText || item.englishText }}</span>
+                <div class="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
+                  <span class="font-semibold text-text-dark text-sm leading-relaxed truncate">{{ item.chineseText || item.englishText }}</span>
+                  <span v-if="item.subMode === 'intensive-reading'"
+                        class="flex-shrink-0 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full font-medium">精读</span>
+                </div>
                 <button @click.stop="deleteHistoryItem(item._historyIndex)" class="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-500 text-xs flex items-center justify-center ml-1">✕</button>
               </div>
-              <div v-if="item.basicVersions && item.basicVersions[0]" class="text-gray-500 text-xs ml-0 mb-1 line-clamp-1">
-                简单版：{{ item.basicVersions[0].en || item.basicVersions[0].zh }}
+              <div v-if="item.subMode === 'intensive-reading'" class="text-gray-500 text-xs ml-0 mb-1 line-clamp-1">
+                全文翻译：{{ item.fullTranslation?.substring(0, 60) }}...
+              </div>
+              <div v-else-if="item.gradeRecord" class="text-cet-orange text-xs font-medium mb-1">
+                🏆 批改评分：{{ item.gradeRecord.overallScore }} 分
+              </div>
+              <div v-if="item.translationPairs && item.translationPairs[0]" class="text-gray-500 text-xs ml-0 mb-1 line-clamp-1">
+                简单版：{{ item.translationPairs[0].basic?.text || item.translationPairs[0].basicVersions?.[0]?.text }}
+              </div>
+              <div v-else-if="item.basicVersions && item.basicVersions[0]" class="text-gray-500 text-xs ml-0 mb-1 line-clamp-1">
+                简单版：{{ item.basicVersions[0].en || item.basicVersions[0].zh || item.basicVersions[0].text }}
               </div>
               <div class="text-gray-400 text-xs">
                 {{ formatTime(item.lastQuery) }}
@@ -530,10 +955,13 @@
               <div class="text-sm mb-1">暂无作文记录</div>
               <div class="text-xs">去大作文模式写几篇吧！</div>
             </div>
-            <div v-for="(item, idx) in sortedEssays" :key="idx" @click="queryEssayFromSummary(item.topic)" class="bg-white rounded-xl px-4 py-3 mb-2.5 shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
+            <div v-for="(item, idx) in sortedEssays" :key="idx" @click="queryEssayFromSummary(item)" class="bg-white rounded-xl px-4 py-3 mb-2.5 shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
               <div class="flex items-center justify-between mb-1">
                 <span class="font-semibold text-text-dark text-sm leading-relaxed flex-1 mr-2">{{ item.topic }}</span>
                 <button @click.stop="deleteHistoryItem(item._historyIndex)" class="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-500 text-xs flex items-center justify-center ml-1">✕</button>
+              </div>
+              <div v-if="item.gradeRecord" class="text-cet-orange text-xs font-medium mb-1">
+                🏆 批改评分：{{ item.gradeRecord.overallScore }} 分
               </div>
               <div v-if="item.basicTemplate && item.basicTemplate.paragraphs" class="text-gray-500 text-xs ml-0 mb-1 line-clamp-1">
                 {{ item.basicTemplate.paragraphs[0]?.section }}：{{ item.basicTemplate.paragraphs[0]?.en?.substring(0, 50) }}...
@@ -551,10 +979,13 @@
               <div class="text-sm mb-1">暂无小作文记录</div>
               <div class="text-xs">去小作文模式写几篇吧！</div>
             </div>
-            <div v-for="(item, idx) in sortedShortEssays" :key="idx" @click="queryEssayFromSummary(item.topic)" class="bg-white rounded-xl px-4 py-3 mb-2.5 shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
+            <div v-for="(item, idx) in sortedShortEssays" :key="idx" @click="queryEssayFromSummary(item)" class="bg-white rounded-xl px-4 py-3 mb-2.5 shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
               <div class="flex items-center justify-between mb-1">
                 <span class="font-semibold text-text-dark text-sm leading-relaxed flex-1 mr-2">{{ item.topic }}</span>
                 <button @click.stop="deleteHistoryItem(item._historyIndex)" class="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-500 text-xs flex items-center justify-center ml-1">✕</button>
+              </div>
+              <div v-if="item.gradeRecord" class="text-cet-orange text-xs font-medium mb-1">
+                🏆 批改评分：{{ item.gradeRecord.overallScore }} 分
               </div>
               <div v-if="item.basicTemplate && item.basicTemplate.paragraphs" class="text-gray-500 text-xs ml-0 mb-1 line-clamp-1">
                 {{ item.basicTemplate.paragraphs[0]?.section }}：{{ item.basicTemplate.paragraphs[0]?.en?.substring(0, 50) }}...
@@ -572,10 +1003,13 @@
               <div class="text-sm mb-1">暂无大作文记录</div>
               <div class="text-xs">去大作文模式写几篇吧！</div>
             </div>
-            <div v-for="(item, idx) in sortedLongEssays" :key="idx" @click="queryEssayFromSummary(item.topic)" class="bg-white rounded-xl px-4 py-3 mb-2.5 shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
+            <div v-for="(item, idx) in sortedLongEssays" :key="idx" @click="queryEssayFromSummary(item)" class="bg-white rounded-xl px-4 py-3 mb-2.5 shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
               <div class="flex items-center justify-between mb-1">
                 <span class="font-semibold text-text-dark text-sm leading-relaxed flex-1 mr-2">{{ item.topic }}</span>
                 <button @click.stop="deleteHistoryItem(item._historyIndex)" class="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-500 text-xs flex items-center justify-center ml-1">✕</button>
+              </div>
+              <div v-if="item.gradeRecord" class="text-cet-orange text-xs font-medium mb-1">
+                🏆 批改评分：{{ item.gradeRecord.overallScore }} 分
               </div>
               <div v-if="item.basicTemplate && item.basicTemplate.paragraphs" class="text-gray-500 text-xs ml-0 mb-1 line-clamp-1">
                 {{ item.basicTemplate.paragraphs[0]?.section }}：{{ item.basicTemplate.paragraphs[0]?.en?.substring(0, 50) }}...
@@ -653,9 +1087,36 @@
               </div>
             </div>
 
+            <!-- 视觉识别 API Key（通义千问，拍照 OCR 用） -->
+            <div>
+              <label class="text-xs text-gray-500 mb-1.5 block">视觉识别 Key（通义千问）</label>
+              <div class="flex items-center gap-1 bg-gray-50 rounded-lg border border-gray-200 focus-within:border-wechat-green transition-colors">
+                <input
+                  v-model="state.ocrApiKey"
+                  :type="state.ocrApiKeyVisible ? 'text' : 'password'"
+                  class="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none"
+                  placeholder="sk-..."
+                />
+                <button @click="state.ocrApiKeyVisible = !state.ocrApiKeyVisible" class="px-2 text-gray-400 hover:text-gray-600 text-sm transition-colors">
+                  {{ state.ocrApiKeyVisible ? '🙈' : '👁' }}
+                </button>
+              </div>
+              <div class="text-xs text-gray-400 mt-1">用于拍照识别文字，<a href="https://dashscope.aliyun.com/" target="_blank" class="text-blue-500 underline">去获取 →</a></div>
+            </div>
+
             <!-- 测试连接 -->
             <button @click="testConnection()" :disabled="state.isTesting" class="w-full text-sm text-gray-500 border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors disabled:opacity-50">
               {{ state.isTesting ? '⏳ 测试中...' : '🔗 测试连接' }}
+            </button>
+
+            <!-- 导出数据 -->
+            <button @click="exportAllData()" class="w-full text-sm text-gray-500 border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">
+              📥 导出全部数据（Markdown）
+            </button>
+
+            <!-- 清除全部数据 -->
+            <button @click="clearAllData()" class="w-full text-sm text-red-400 border border-red-200 rounded-lg py-2 hover:bg-red-50 transition-colors">
+              🗑️ 清除全部数据
             </button>
 
             <!-- 费用提示 -->
@@ -711,6 +1172,60 @@
       </div>
     </template>
 
+    <!-- ==================== OCR 识别结果编辑弹窗 ==================== -->
+    <template v-if="state.showOcrResult">
+      <div @click="cancelOcrResult()" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div @click.stop class="bg-white rounded-2xl w-full max-w-[380px] shadow-xl modal-enter overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+            <span class="font-semibold text-text-dark text-sm">📋 识别结果（可编辑修改）</span>
+            <button @click="cancelOcrResult()" class="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+          </div>
+          <div class="px-5 py-3">
+            <textarea
+              v-model="state.ocrResultText"
+              rows="6"
+              class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-wechat-green resize-none leading-relaxed"
+              placeholder="识别结果为空"
+            ></textarea>
+            <div class="text-xs text-gray-400 mt-1">💡 可修改、删减、修正识别内容后再填入</div>
+          </div>
+          <div class="flex gap-2.5 px-5 pb-4">
+            <button @click="cancelOcrResult()" class="flex-1 text-sm border border-gray-200 text-gray-500 rounded-lg py-2.5 hover:bg-gray-50 transition-colors">取消</button>
+            <button @click="confirmOcrResult()" :disabled="!state.ocrResultText.trim()" class="flex-1 text-sm bg-wechat-green text-text-dark font-medium rounded-lg py-2.5 hover:opacity-80 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">确认填入</button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ==================== VL 识图结果调试弹窗（考研大作文） ==================== -->
+    <template v-if="state.showVLResult">
+      <div @click="cancelVLResult()" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div @click.stop class="bg-white rounded-2xl w-full max-w-[380px] shadow-xl modal-enter overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+            <span class="font-semibold text-text-dark text-sm">🖼️ VL 识别结果（可编辑修改）</span>
+            <button @click="cancelVLResult()" class="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+          </div>
+          <div class="px-5 py-3">
+            <textarea
+              v-model="state.vlResultRaw"
+              rows="10"
+              class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-xs outline-none focus:border-indigo-400 resize-none leading-relaxed font-mono"
+              placeholder="识别结果为空"
+            ></textarea>
+            <div class="text-xs text-gray-400 mt-1">💡 检查 VL 返回内容，可手动编辑修正后再确认填入</div>
+          </div>
+          <div class="flex gap-2.5 px-5 pb-4">
+            <button @click="cancelVLResult()" class="flex-1 text-sm border border-gray-200 text-gray-500 rounded-lg py-2.5 hover:bg-gray-50 transition-colors">取消</button>
+            <button @click="confirmVLResult()" :disabled="!state.vlResultRaw.trim()" class="flex-1 text-sm bg-indigo-500 text-white font-medium rounded-lg py-2.5 hover:bg-indigo-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">确认填入</button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- 隐藏的拍照输入（调起后置摄像头） -->
+    <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onPhotoTaken" />
+    <input id="essayCameraInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onEssayPhotoTaken" />
+
   </div>
 
   <!-- Vue 3 CDN -->
@@ -724,7 +1239,10 @@
         // ==================== 常量 ====================
         const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
         const DEEPSEEK_MODEL = 'deepseek-chat';
+        const DASHSCOPE_API_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+        const QWEN_VL_MODEL = 'qwen-vl-plus';
         const STORAGE_KEY_API = 'cet6-api-key';
+        const STORAGE_KEY_OCR = 'ocr-api-key';
         const STORAGE_KEY_EXAM_TYPE = 'exam-type';
         const STORAGE_KEY_CET6 = 'cet6-data';
         const STORAGE_KEY_POSTGRAD = 'postgrad-data';
@@ -816,20 +1334,30 @@
           inputText: '',
           inputError: false,
           isSending: false,
+          isOcrProcessing: false,       // OCR 拍照识别进行中
+          ocrResultText: '',            // 识别结果文本（编辑弹窗用）
+          showOcrResult: false,        // 是否展示识别结果弹窗
 
           // 作文两步交互上下文（统一用于所有 essay 模式）
           essayContext: null,           // { topic, analysis } | null
           // 考研大作文结构化描述表单
           essayFormData: {
-            subjects: '', children: '', action: '', meaning: '',  // 图画作文
+            longEssayType: 'picture',    // 'picture'（图画）| 'chart'（图表）
+            subjects: '', action: '', meaning: '',             // 图画作文
             chartType: '', chartTitle: '', dataPoints: '', trend: '', phenomenon: '',  // 图表作文
+            description: '',             // 额外说明（VL 必须填，用户可不修改）
             extraKeywords: ''
           },
 
           showSettings: false,
           apiKey: '',
           apiKeyVisible: false,
+          ocrApiKey: '',
+          ocrApiKeyVisible: false,
           isTesting: false,
+          showVLResult: false,         // VL 识别结果调试弹窗
+          vlResultRaw: '',             // VL 原始返回文本
+          showWelcomeModal: false,    // 首次登录欢迎弹窗
 
           showFolderDropdown: false,
           showNewFolderDialog: false,
@@ -838,11 +1366,25 @@
           toast: { show: false, message: '', type: 'success' },
 
           confirmDialog: { show: false, message: '', onConfirm: null },
+
+          // 翻译/作文的"解析后选择"交互状态（统一管理）
+          translateContext: null,       // { text, analysis, translationPairs } | null
+          postAnalysisAction: null,     // null | 'grade' | 'generate' — 解析后的操作选择
+          gradingUserAnswer: '',        // 用户粘贴的译文/作文，用于批改
+
+          // 翻译子模式：'analysis'（翻译题目解析，默认）| 'intensive-reading'（阅读段落精读）
+          translationSubMode: 'analysis',
         });
 
         // ==================== 工具函数 ====================
         function genId(prefix) {
           return prefix + '_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+        }
+
+        // 英文词数统计
+        function countWords(text) {
+          if (!text) return 0;
+          return text.trim().split(/\s+/).filter(w => w.length > 0).length;
         }
 
         // ==================== 数据持久化 ====================
@@ -979,6 +1521,7 @@
           // 清空旧消息
           state.messages = [];
           state.essayContext = null;
+          state.translationSubMode = 'analysis';
           resetEssayFormData();
           state.inputText = '';
           addWelcomeMessage();
@@ -991,6 +1534,10 @@
           state.apiKey = localStorage.getItem(STORAGE_KEY_API) || '';
         }
 
+        function loadOcrApiKey() {
+          state.ocrApiKey = localStorage.getItem(STORAGE_KEY_OCR) || '';
+        }
+
         // ==================== 计算属性 ====================
         const examConfig = computed(() => EXAM_CONFIG[state.examType]);
         const currentModeConfig = computed(() => examConfig.value.modes[state.currentMode] || {});
@@ -998,7 +1545,27 @@
         const inputPlaceholder = computed(() => {
           const cfg = examConfig.value;
           const mc = currentModeConfig.value;
-          if (mc.isEssayMode && state.essayContext) {
+
+          // 精读模式：专用 placeholder
+          if (mc.isTranslationMode && state.translationSubMode === 'intensive-reading') {
+            return state.currentMode === 'translate'
+              ? '📖 输入中文段落进行精读分析...'
+              : '📖 输入英文段落进行精读分析...';
+          }
+
+          // 解析后等待用户选择操作
+          if ((mc.isTranslationMode && state.translateContext && !state.postAnalysisAction)
+            || (mc.isEssayMode && state.essayContext && !state.postAnalysisAction)) {
+            return '👆 请在上方选择操作方式';
+          }
+
+          // 批改模式：在底部输入栏输入译文/作文
+          if (state.postAnalysisAction === 'grade') {
+            return mc.isTranslationMode ? '✏️ 输入你的译文，按回车提交批改...' : '✏️ 输入你的作文，按回车提交批改...';
+          }
+
+          // 作文——直接生成：输入关键词
+          if (mc.isEssayMode && state.essayContext && state.postAnalysisAction === 'generate') {
             return cfg.placeholder[state.currentMode + '-keyword']
               || cfg.placeholder.essayKeyword
               || '输入关键词或句式（可跳过）...';
@@ -1186,9 +1753,24 @@
         function switchMode(mode) {
           if (state.currentMode === mode) return;
           state.currentMode = mode;
-          state.essayContext = null;
+          // 保留 essayContext / translateContext / postAnalysisAction，
+          // 这样用户切回来时批改/模板选择按钮不丢失
           resetEssayFormData();
           state.inputText = '';
+          addWelcomeMessage();
+          scrollToBottom();
+        }
+
+        function switchTranslationSubMode(subMode) {
+          if (state.translationSubMode === subMode) return;
+          state.translationSubMode = subMode;
+          state.translateContext = null;
+          state.postAnalysisAction = null;
+          state.gradingUserAnswer = '';
+          showToast(subMode === 'intensive-reading' ? '📖 当前是「阅读段落精读」' : '📝 当前是「翻译题目解析」');
+          // 刷新欢迎消息以显示正确的子模式提示
+          const welcomeIdx = state.messages.findIndex(m => m.type === 'welcome' && m.mode === state.currentMode);
+          if (welcomeIdx !== -1) state.messages.splice(welcomeIdx, 1);
           addWelcomeMessage();
           scrollToBottom();
         }
@@ -1203,18 +1785,341 @@
           });
         }
 
+        // ==================== 拍照 OCR 识别（通义千问 VL） ====================
+        function openCamera() {
+          const input = document.getElementById('cameraInput');
+          if (input) input.click();
+        }
+
+        function compressImage(file) {
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+              const MAX_SIZE = 1024;
+              let { width, height } = img;
+              if (width > height && width > MAX_SIZE) {
+                height = Math.round(height * MAX_SIZE / width);
+                width = MAX_SIZE;
+              } else if (height > MAX_SIZE) {
+                width = Math.round(width * MAX_SIZE / height);
+                height = MAX_SIZE;
+              }
+
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, width, height);
+
+              canvas.toBlob((blob) => {
+                if (!blob) { reject(new Error('图片处理失败')); return; }
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('图片读取失败'));
+                reader.readAsDataURL(blob);
+              }, 'image/jpeg', 0.7);
+            };
+            img.onerror = () => reject(new Error('图片加载失败，请重试'));
+            img.src = URL.createObjectURL(file);
+          });
+        }
+
+        async function ocrImage(base64) {
+          const apiKey = localStorage.getItem(STORAGE_KEY_OCR);
+          if (!apiKey) {
+            state.showSettings = true;
+            throw new Error('请先设置通义千问视觉识别 API Key');
+          }
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+          try {
+            const response = await fetch(DASHSCOPE_API_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify({
+                model: QWEN_VL_MODEL,
+                messages: [{
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: '请识别图片中的所有文字内容，直接输出原文，不要添加任何解释。中文输出中文，英文输出英文。' },
+                    { type: 'image_url', image_url: { url: base64 } }
+                  ]
+                }],
+                temperature: 0,
+                max_tokens: 1024
+              }),
+              signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.status === 401) throw new Error('❌ 千问 API Key 无效，请前往设置更新');
+            if (response.status === 429) throw new Error('⏱️ 请求过于频繁，请稍后重试');
+            if (!response.ok) throw new Error(`识别失败 (${response.status})，请稍后重试`);
+
+            const data = await response.json();
+            const text = data.choices?.[0]?.message?.content?.trim() || '';
+            if (!text) throw new Error('未识别到文字，请重试');
+            return text;
+          } catch (err) {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') throw new Error('⏱️ 识别超时，请重试');
+            if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+              throw new Error('⏱️ 网络连接失败，请检查网络后重试');
+            }
+            throw err;
+          }
+        }
+
+        function cancelOcrResult() {
+          state.showOcrResult = false;
+          state.ocrResultText = '';
+        }
+
+        function confirmOcrResult() {
+          const text = state.ocrResultText.trim();
+          if (!text) return;
+          state.inputText = text;
+          state.showOcrResult = false;
+          state.ocrResultText = '';
+          showToast('✅ 已填入输入框');
+        }
+
+        async function onPhotoTaken(event) {
+          const file = event.target.files?.[0];
+          if (!file) return;
+
+          state.isOcrProcessing = true;
+
+          try {
+            const base64 = await compressImage(file);
+            const text = await ocrImage(base64);
+            if (text) {
+              state.ocrResultText = text;
+              state.showOcrResult = true;
+            } else {
+              showToast('未识别到文字，请重试', 'error');
+            }
+          } catch (err) {
+            showToast(err.message || '识别失败，请重试', 'error');
+          } finally {
+            state.isOcrProcessing = false;
+            event.target.value = '';
+          }
+        }
+
+        // ==================== 考研大作文拍照识图（VL 结构化分析） ====================
+        function buildVLImagePrompt() {
+          const isPic = state.essayFormData.longEssayType === 'picture';
+          if (isPic) {
+            return `观察这幅图画，逐行输出以下5行内容，每行必须严格以"字段名：内容"格式书写，不要用括号、不要加序号、不要写成段落。
+
+类型：图画作文
+人物/主体：写出图中的人物或主体
+动作/场景：写出他们正在做什么以及场景环境
+反映寓意：写出图画的深层寓意或社会现象
+额外说明：用2-3句话综合描述画面全貌、人物表情、细节元素`;
+          } else {
+            return `观察这张图表，逐行输出以下6行内容，每行必须严格以"字段名：内容"格式书写，不要用括号、不要加序号、不要写成段落。
+
+类型：图表作文
+图表类型：柱状图或饼图或折线图或表格
+标题/主题：图表标题或反映主题
+关键数据：关键数据及变化
+整体趋势：上升或下降或波动或稳定
+反映现象：反映的社会现象或问题
+额外说明：用2-3句话综合描述图表全貌、数据对比等信息`;
+          }
+        }
+
+        function parseVLResult(text) {
+          const fd = state.essayFormData;
+          console.log('[VL原文]', text);
+
+          // 预处理：按常见分隔符拆成片段，再逐行处理
+          // VL 可能返回"人物/主体：xxx，动作/场景：yyy"等紧凑格式
+          const segments = text
+            .replace(/[，,]\s*(?=[^\s]{1,6}[：:])/g, '\n')  // 逗号后紧跟短字段名+冒号 → 拆行
+            .replace(/[。；;]\s*(?=[^\s]{1,6}[：:])/g, '\n') // 句号/分号同理
+            .split('\n');
+
+          let detectedType = '';
+          for (const segment of segments) {
+            const line = segment
+              .replace(/^[\s\-\*#>|]+/, '')       // 去行首符号
+              .replace(/\*{1,3}/g, '')              // 去加粗标记
+              .trim();
+            if (!line) continue;
+
+            // 用贪婪方式匹配 key:value
+            const match = line.match(/^([^：:\n]+)[：:]\s*(.+)/);
+            if (!match) continue;
+
+            const key = match[1].trim();
+            const value = match[2].trim();
+            if (!value) continue;
+
+            console.log('[VL字段]', key, '→', value.substring(0, 40));
+
+            // 关键词匹配
+            if (key.includes('类型') && !key.includes('图表')) {
+              detectedType = value;
+            } else if (key.includes('人物') || key.includes('主体')) {
+              if (!fd.subjects) fd.subjects = value;
+            } else if (key.includes('动作') || key.includes('场景') || key.includes('行为')) {
+              if (!fd.action) fd.action = value;
+            } else if (key.includes('寓意') || key.includes('含义') || key.includes('启示')) {
+              if (!fd.meaning) fd.meaning = value;
+            } else if (key.includes('图表') && (key.includes('类型') || key.includes('形式') || key.includes('种类'))) {
+              fd.chartType = value;
+            } else if ((key.includes('标题') || key.includes('主题')) && !key.includes('人物')) {
+              fd.chartTitle = value;
+            } else if (key.includes('数据') || key.includes('数值')) {
+              fd.dataPoints = value;
+            } else if (key.includes('趋势') || key.includes('变化') || key.includes('走向')) {
+              fd.trend = value;
+            } else if (key.includes('现象') || key.includes('问题')) {
+              fd.phenomenon = value;
+            } else if (key.includes('说明') || key.includes('描述') || key.includes('全貌') || key.includes('整体')) {
+              fd.description = value;
+            }
+          }
+
+          // 兜底：如果只有额外说明有内容，尝试从中提取关键信息
+          if (fd.description && !fd.subjects && !fd.action && !fd.meaning && !fd.chartType) {
+            const desc = fd.description;
+            const subjectMatch = desc.match(/(?:图中|画面中|描绘了?|展示了?)\s*[，,]?\s*(.{2,20}?)(?:[，,。；;]|\s(?:正在|各自|分别|在|坐|站|走|看|玩|拿|举|指))/);
+            if (subjectMatch && !fd.subjects) fd.subjects = subjectMatch[1].trim();
+            const actionMatch = desc.match(/(?:正在|各自|分别)?(.{2,30}?)(?:[，,。]|反映了?|寓意|体现|说明)/);
+            if (actionMatch && !fd.action) fd.action = actionMatch[1].trim();
+          }
+
+          // 根据类型切换表单模式
+          if (detectedType.includes('图表')) {
+            fd.longEssayType = 'chart';
+          } else if (detectedType.includes('图画')) {
+            fd.longEssayType = 'picture';
+          }
+        }
+
+        function openEssayCamera() {
+          const input = document.getElementById('essayCameraInput');
+          if (input) input.click();
+        }
+
+        async function onEssayPhotoTaken(event) {
+          const file = event.target.files?.[0];
+          if (!file) return;
+
+          state.isOcrProcessing = true;
+          try {
+            const base64 = await compressImage(file);
+            const prompt = buildVLImagePrompt();
+            const text = await analyzeImage(base64, prompt);
+            if (text) {
+              state.vlResultRaw = text;
+              state.showVLResult = true;
+            } else {
+              showToast('未识别到内容，请重试', 'error');
+            }
+          } catch (err) {
+            showToast(err.message || '识别失败，请重试', 'error');
+          } finally {
+            state.isOcrProcessing = false;
+            event.target.value = '';
+          }
+        }
+
+        function confirmVLResult() {
+          if (state.vlResultRaw) {
+            parseVLResult(state.vlResultRaw);
+            showToast('✅ 已解析并填入表单');
+          }
+          state.showVLResult = false;
+          state.vlResultRaw = '';
+        }
+
+        function cancelVLResult() {
+          state.showVLResult = false;
+          state.vlResultRaw = '';
+        }
+
+        async function analyzeImage(base64, prompt) {
+          const apiKey = localStorage.getItem(STORAGE_KEY_OCR);
+          if (!apiKey) {
+            state.showSettings = true;
+            throw new Error('请先设置通义千问视觉识别 API Key');
+          }
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 25000);
+          try {
+            const response = await fetch(DASHSCOPE_API_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify({
+                model: QWEN_VL_MODEL,
+                messages: [{
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: prompt },
+                    { type: 'image_url', image_url: { url: base64 } }
+                  ]
+                }],
+                temperature: 0,
+                max_tokens: 1024
+              }),
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            if (response.status === 401) throw new Error('❌ 千问 API Key 无效');
+            if (response.status === 429) throw new Error('⏱️ 请求过于频繁，请稍后重试');
+            if (!response.ok) throw new Error(`识别失败 (${response.status})`);
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content?.trim() || '';
+          } catch (err) {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') throw new Error('⏱️ 识别超时，请重试');
+            throw err;
+          }
+        }
+
         // ==================== 聊天消息 ====================
         function resetChat() {
           state.messages = [];
           state.inputText = '';
           state.inputError = false;
           state.essayContext = null;
+          state.translateContext = null;
+          state.postAnalysisAction = null;
+          state.gradingUserAnswer = '';
           addWelcomeMessage();
         }
 
         function addWelcomeMessage() {
           // 当前模式已有消息则跳过
           if (state.messages.some(m => m.mode === state.currentMode)) return;
+
+          // 考研大作文：直接显示结构化描述表单
+          if (state.currentMode === 'long-essay') {
+            resetEssayFormData();
+            state.messages.unshift({
+              id: genId('m'),
+              role: 'ai',
+              type: 'long-essay-form',
+              mode: state.currentMode,
+              time: new Date().toISOString(),
+              showTime: false
+            });
+            return;
+          }
 
           const hasKey = !!localStorage.getItem(STORAGE_KEY_API);
           const folder = currentFolder.value;
@@ -1237,6 +2142,14 @@
             if (parts.length > 0) {
               content += `<br><br><span style="font-size:12px;color:#999;">📝 本文件夹已有 ${parts.join('、')} 记录，去「📊 历史记录」查看汇总</span>`;
             }
+          }
+
+          // 翻译模式下追加子模式提示
+          if (currentModeConfig.value.isTranslationMode) {
+            const subModeHint = state.translationSubMode === 'intensive-reading'
+              ? '<br><br><span style="font-size:12px;color:#7C3AED;">💡 当前为「阅读段落精读」模式，输入段落将一次性返回全文翻译、逐句对照、核心词汇和长难句精析。</span>'
+              : '<br><br><span style="font-size:12px;color:#2563EB;">💡 当前为「翻译题目解析」模式，输入句子后将先解析结构，再选择批改或查看示例译文。</span>';
+            content += subModeHint;
           }
 
           if (!hasKey) {
@@ -1285,8 +2198,37 @@
             return;
           }
 
-          // 作文模式第二步：输入关键词（可为空）
-          if (mc.isEssayMode && state.essayContext) {
+          // 解析后等待用户选择操作（翻译/作文通用）—— 精读模式跳过此检查
+          const awaitingAction = state.translationSubMode !== 'intensive-reading'
+            && ((mc.isTranslationMode && state.translateContext && !state.postAnalysisAction)
+              || (mc.isEssayMode && state.essayContext && !state.postAnalysisAction));
+          if (awaitingAction) {
+            showToast('请先在上方选择操作方式', 'error');
+            return;
+          }
+
+          // 批改模式：用户在底部输入栏输入译文/作文，按回车提交批改
+          if (state.postAnalysisAction === 'grade') {
+            if (!text) {
+              state.inputError = true;
+              state.inputText = '';
+              const input = document.querySelector('#app .flex-shrink-0.bg-white.border-t input[type="text"]');
+              if (input) {
+                input.classList.add('shake');
+                setTimeout(() => input.classList.remove('shake'), 300);
+              }
+              setTimeout(() => { state.inputError = false; }, 2000);
+              return;
+            }
+            state.inputError = false;
+            state.isSending = true;
+            state.inputText = '';
+            submitGrading(text);
+            return;
+          }
+
+          // 作文模式——直接生成第二步：输入关键词（可为空）
+          if (mc.isEssayMode && state.essayContext && state.postAnalysisAction === 'generate') {
             state.inputError = false;
             state.isSending = true;
             sendEssayWithKeywords(text || '');
@@ -1312,6 +2254,18 @@
             return;
           }
 
+          // 词汇模式：输入过长时引导用户使用翻译或精读模式
+          if (state.currentMode === 'vocab') {
+            const wordCount = text.trim().split(/\s+/).filter(w => /[a-zA-Z]/.test(w)).length;
+            if (wordCount > 15) {
+              const hasTranslate = state.examType === 'cet6' ? '🈂️ 中译英' : '🈂️ 英译中';
+              showToast(`📖 检测到 ${wordCount} 个单词，建议切换到「${hasTranslate}」→「阅读段落精读」进行长文本分析`, 'error');
+              state.inputError = true;
+              setTimeout(() => { state.inputError = false; }, 3000);
+              return;
+            }
+          }
+
           state.inputError = false;
           state.isSending = true;
 
@@ -1322,18 +2276,22 @@
             sendTranslateQuery(text);
           } else if (state.currentMode === 'en-to-cn') {
             sendEnToCnQuery(text);
-          } else if (mc.isEssayMode) {
+          } else if (mc.isEssayMode && state.currentMode !== 'long-essay') {
             sendEssayTopicQuery(text);
+          } else if (state.currentMode === 'long-essay') {
+            showToast('请先在上方表单填写图画/图表内容并确认', 'error');
+            state.isSending = false;
           }
         }
 
         async function sendVocabQuery(text) {
+          const mode = state.currentMode; // 捕获当前模式，防止异步期间切换导致消息串位
           // 添加用户消息
           state.messages.push({
             id: genId('m'),
             role: 'user',
             type: 'query',
-            mode: state.currentMode,
+            mode: mode,
             content: text,
             time: new Date().toISOString(),
             showTime: state.messages.length > 0
@@ -1344,7 +2302,7 @@
             id: genId('m'),
             role: 'ai',
             type: 'loading',
-            mode: state.currentMode,
+            mode: mode,
             content: '',
             time: new Date().toISOString(),
             showTime: false
@@ -1380,11 +2338,23 @@
               existingRecord.cetFrequency = cetFrequency;
               existingRecord.cetFrequencyScore = cetFrequencyScore;
               if (meaning) existingRecord.meaning = meaning;
+              existingRecord.lastResult = {
+                spellCheck: result.spellCheck,
+                definition: result.definition,
+                cetFrequency: result.cetFrequency,
+                extension: result.extension
+              };
               saveFolders();
               historyNote = `📝 你已查询过该词，累计 ${existingRecord.count} 次`;
             } else {
-              // 新增记录（存纠正后的正确拼写）
-              addToHistory(correctedWord, cetFrequency, cetFrequencyScore, meaning);
+              // 新增记录（存纠正后的正确拼写 + 完整结果）
+              const lastResult = {
+                spellCheck: result.spellCheck,
+                definition: result.definition,
+                cetFrequency: result.cetFrequency,
+                extension: result.extension
+              };
+              addToHistory(correctedWord, cetFrequency, cetFrequencyScore, meaning, lastResult);
               saveFolders();
             }
 
@@ -1400,7 +2370,7 @@
                 id: genId('m'),
                 role: 'ai',
                 type: 'result',
-                mode: state.currentMode,
+                mode: mode,
                 content: result,
                 queryText: text,
                 time: new Date().toISOString(),
@@ -1415,7 +2385,7 @@
                 id: genId('m'),
                 role: 'ai',
                 type: 'error',
-                mode: state.currentMode,
+                mode: mode,
                 content: err.message || '请求失败，请稍后重试',
                 time: new Date().toISOString(),
                 showTime: false
@@ -1493,28 +2463,50 @@
 返回格式要求（必须严格遵守）：
 {
   "analysis": {
-    "structure": "句子结构分析（主谓宾、从句类型、修饰关系等）",
-    "approach": "翻译策略和注意事项（如语序调整、词性转换等）"
+    "segments": [
+      {
+        "original": "原文片段（将用户输入按意群或分句拆分，逐段对应）",
+        "structure": "该片段的结构分析（主谓宾/修饰关系/特殊句式等）",
+        "approach": "该片段的翻译要点（语序调整/词性转换/地道表达等）"
+      }
+    ]
   },
-  "basicVersions": [
+  "translationPairs": [
     {
-      "en": "简单译文（用简单词汇和句式，确保语法正确即可得分）",
-      "score": "预估得分档位（如 10-12分/15分制）",
-      "tips": "得分要点：为什么这个版本能拿分"
-    }
-  ],
-  "advancedVersions": [
-    {
-      "en": "进阶译文（使用高级句式和精准词汇）",
-      "highlights": ["亮点1：使用了什么高级语法或地道表达", "亮点2"],
-      "knowledgePoints": ["知识点1：语法/搭配说明", "知识点2"]
+      "original": "原文句子1",
+      "basicVersions": [
+        {
+          "text": "简单版译文1（用简单词汇和句式）",
+          "score": "预估得分档位（如 10-12分/15分制）",
+          "tips": "得分要点"
+        },
+        {
+          "text": "简单版译文2（另一种简单表述）",
+          "score": "预估得分档位",
+          "tips": "得分要点"
+        }
+      ],
+      "advancedVersions": [
+        {
+          "text": "进阶版译文1（使用高级句式）",
+          "highlights": ["亮点1"],
+          "knowledgePoints": ["知识点1"]
+        },
+        {
+          "text": "进阶版译文2（另一种高级表述）",
+          "highlights": ["亮点1"],
+          "knowledgePoints": ["知识点1"]
+        }
+      ]
     }
   ]
 }
 
 注意：
-- basicVersions 给出2-3个不同角度的简单表述。简单不等于随意——语法正确、核心意思传达清楚即可。每个版本说明预估得分档位和得分要点
-- advancedVersions 给出2-3个进阶表述。使用更高级的句式（如定语从句、虚拟语气、倒装、分词结构等）和更精准的词汇搭配，标注每个版本的亮点和相关知识点
+- analysis.segments 将用户输入按意群/分句拆分为 2-4 段，每段给出原文、结构分析和翻译要点
+- translationPairs 与 analysis.segments 一一对应，每句给出 original（原文）、basicVersions（2个简单版译文，不同角度表述）、advancedVersions（2个进阶版译文，不同句式/词汇选择），方便逐句对照学习
+- basicVersions 每个版本用简单词汇和句式，语法正确即可；两个版本从不同角度表达（如不同主语、不同语序）
+- advancedVersions 每个版本使用高级句式（定语从句、虚拟语气、倒装、分词结构等）和精准词汇搭配；两个版本用不同的高级表达方式
 - 严格符合六级翻译评分标准（准确、通顺、得体）
 - 必须返回有效的 JSON，不要包含任何 JSON 之外的内容`;
         }
@@ -1603,8 +2595,16 @@ ${keywordLine}
 
         // ==================== Prompt Dispatch ====================
         function buildTranslationPrompt() {
-          if (state.currentMode === 'translate') return buildTranslatePrompt();
-          if (state.currentMode === 'en-to-cn') return buildEnToCnPrompt();
+          if (state.currentMode === 'translate') {
+            return state.translationSubMode === 'intensive-reading'
+              ? buildIntensiveReadingPrompt('translate')
+              : buildTranslatePrompt();
+          }
+          if (state.currentMode === 'en-to-cn') {
+            return state.translationSubMode === 'intensive-reading'
+              ? buildIntensiveReadingPrompt('en-to-cn')
+              : buildEnToCnPrompt();
+          }
           return '';
         }
 
@@ -1630,29 +2630,86 @@ ${keywordLine}
 返回格式要求（必须严格遵守）：
 {
   "analysis": {
-    "structure": "句子结构分析（主谓宾、从句类型、修饰关系、特殊结构如强调/倒装/虚拟等）",
-    "approach": "翻译策略和注意事项（如拆分长句、语序调整、词性转换、增词/减词技巧等）"
+    "segments": [
+      {
+        "original": "原文片段（将用户输入按意群或分句拆分，逐段对应）",
+        "structure": "该片段的结构分析（主谓宾/从句类型/特殊结构如强调倒装虚拟等）",
+        "approach": "该片段的翻译要点（拆分长句/语序调整/词性转换/增词减词技巧等）"
+      }
+    ]
   },
-  "basicVersions": [
+  "translationPairs": [
     {
-      "zh": "简单通顺的中文译文（准确传达原意，语言通顺即可得分）",
-      "score": "预估得分档位（如 3-4分/5分制，考研翻译每题满分约2分，此处以5分制参考）",
-      "tips": "得分要点：为什么这个版本能拿分"
-    }
-  ],
-  "advancedVersions": [
-    {
-      "zh": "精准优雅的中文译文（用地道中文表达，体现翻译功底）",
-      "highlights": ["亮点1：运用了什么翻译技巧", "亮点2"],
-      "knowledgePoints": ["知识点1：涉及的语法/翻译技巧说明", "知识点2"]
+      "original": "原文句子1（英文）",
+      "basic": {
+        "text": "简单通顺的中文译文（准确传达原意，语言通顺）",
+        "score": "预估得分档位（如 3-4分/5分制）",
+        "tips": "得分要点说明"
+      },
+      "advanced": {
+        "text": "精准优雅的中文译文（用地道中文表达）",
+        "highlights": ["亮点1：运用了什么翻译技巧"],
+        "knowledgePoints": ["知识点1：涉及的语法/翻译技巧说明"]
+      }
     }
   ]
 }
 
 注意：
-- basicVersions 给出2-3个不同角度的通顺译文。不逐词死译，要符合中文表达习惯。每个版本说明预估得分档位和得分要点
-- advancedVersions 给出2-3个精准译文。综合运用各种翻译技巧（词性转换、语序调整、拆句合句等），体现对英汉语言差异的把握，标注每个版本的亮点和相关知识点
+- analysis.segments 将用户输入的英文按意群/分句拆分为 2-4 段，每段给出原文、结构分析和翻译要点
+- translationPairs 与 analysis.segments 一一对应，每句给出 original（原文）、basic（简单版译文+得分+要点）、advanced（进阶版译文+亮点+知识点），方便逐句对照学习
+- basic.text 准确传达原意、语言通顺即可，不逐词死译
+- advanced.text 综合运用翻译技巧（词性转换、语序调整、拆句合句等），体现对英汉语言差异的把握
 - 严格符合考研英语一翻译评分标准（准确理解原文、汉语表达通顺、无漏译错译）
+- 必须返回有效的 JSON，不要包含任何 JSON 之外的内容`;
+        }
+
+        function buildIntensiveReadingPrompt(direction) {
+          const isEnToCn = direction === 'en-to-cn';
+          const sourceLang = isEnToCn ? '英文' : '中文';
+          const targetLang = isEnToCn ? '中文' : '英文';
+          const examLabel = state.examType === 'cet6' ? '六级' : '考研';
+
+          return `你是一位专业的${examLabel}英语教学专家，擅长${sourceLang}阅读理解与精读教学。
+
+用户会输入一段${sourceLang}文本（可能是一个段落或多个句子）。请你对这段文本进行全面的精读分析，并以严格的 JSON 格式返回结果。
+
+返回格式要求（必须严格遵守）：
+{
+  "fullTranslation": "全文的${targetLang}译文（忠实原文，通顺自然）",
+
+  "sentenceAnalysis": [
+    {
+      "original": "原文句子1",
+      "translation": "该句的${targetLang}译文",
+      "structure": "简要句式说明（如：简单句/复合句/定语从句/状语从句/被动语态/倒装结构等，1-2句话说明核心结构特点）"
+    }
+  ],
+
+  "keyVocabulary": [
+    {
+      "word": "重难词汇",
+      "pos": "词性",
+      "pronunciation": "/发音/（英文词汇提供，中文词汇空字符串）",
+      "meaning": "中文释义",
+      "example": "简短的例句展示用法（中英文对照）"
+    }
+  ],
+
+  "difficultSentences": [
+    {
+      "sentence": "长难句原文",
+      "analysis": "详细句子结构分析（主谓宾定状补划分、从句嵌套关系、特殊句式说明，逐层拆解）",
+      "translation": "精准的${targetLang}译文"
+    }
+  ]
+}
+
+注意：
+- fullTranslation 是整段文本的完整翻译，语言通顺自然
+- sentenceAnalysis 按原文句子顺序逐句对照
+- keyVocabulary 选取对理解段落最关键的重难点词（5-10个），按重要程度降序排列；英文词提供发音，中文词发音字段留空字符串
+- difficultSentences 选取2-3个最复杂的句子逐层分析结构；如果段落简单可以只返回1个或空数组
 - 必须返回有效的 JSON，不要包含任何 JSON 之外的内容`;
         }
 
@@ -1838,13 +2895,114 @@ ${keywordLine}
 - 必须返回有效的 JSON，不要包含任何 JSON 之外的内容`;
         }
 
+        // ==================== 批改 Prompt ====================
+        function buildTranslateGradePrompt(isEnToCn) {
+          const directionLabel = isEnToCn ? '英译中' : '中译英';
+          const sourceLang = isEnToCn ? '英文' : '中文';
+          const targetLang = isEnToCn ? '中文' : '英文';
+          return `你是一位专业的翻译批改专家。用户提供了一段${sourceLang}原文和他们的${targetLang}译文，请进行批改评分。
+
+返回格式（必须严格遵守的 JSON）：
+{
+  "overallScore": 85,
+  "scoreBreakdown": [
+    {"dimension": "准确性", "score": 20, "maxScore": 25, "comment": "简短评价"},
+    {"dimension": "流畅度", "score": 22, "maxScore": 25, "comment": "简短评价"},
+    {"dimension": "语法", "score": 23, "maxScore": 25, "comment": "简短评价"},
+    {"dimension": "词汇运用", "score": 20, "maxScore": 25, "comment": "简短评价"}
+  ],
+  "issues": [
+    {
+      "location": "问题所在位置（如第1句/第2句/结尾）",
+      "sourceText": "问题对应的题目原文句子（${sourceLang}）",
+      "original": "用户的译文片段（${targetLang}）",
+      "problem": "具体问题说明",
+      "suggestion": "修改建议（用${targetLang}给出具体的改写方式）",
+      "suggestionZh": "修改建议的中文释义"
+    }
+  ],
+  "improvedVersion": {
+    "segments": [
+      {
+        "original": "题目原文句子1（${sourceLang}）",
+        "translation": "对应的修改后译文（${targetLang}）"
+      },
+      {
+        "original": "题目原文句子2（${sourceLang}）",
+        "translation": "对应的修改后译文（${targetLang}）"
+      }
+    ]
+  },
+  "overallComment": "总体评价与学习建议（2-3句话，先肯定优点再指出不足，语气鼓励）"
+}
+
+注意：
+- 评分客观公正，参考${directionLabel}评分标准（准确传达原意、语言通顺、用词得当）
+- issues 列出 3-5 条主要问题，每条除用户译文外还要带上对应的题目原文（sourceText），便于用户对照
+- improvedVersion.segments 将原文按句拆分，每句给出对应的修改后译文，形成"一句原文→一句译文"的对照格式，无需额外翻译
+- overallComment 先肯定做得好的地方，再指出最需要改进的方向
+- 必须返回有效的 JSON，不要包含任何 JSON 之外的内容`;
+        }
+
+        function buildEssayGradePrompt() {
+          const examName = state.examType === 'cet6' ? 'CET-6（大学英语六级）' : '考研英语一';
+          return `你是一位专业的${examName}写作批改专家。用户提供了作文题目和他们的作文，请进行批改评分。
+
+返回格式（必须严格遵守的 JSON）：
+{
+  "overallScore": 80,
+  "scoreBreakdown": [
+    {"dimension": "内容切题", "score": 16, "maxScore": 20, "comment": "简短评价"},
+    {"dimension": "结构逻辑", "score": 16, "maxScore": 20, "comment": "简短评价"},
+    {"dimension": "语法准确性", "score": 15, "maxScore": 20, "comment": "简短评价"},
+    {"dimension": "词汇丰富度", "score": 16, "maxScore": 20, "comment": "简短评价"},
+    {"dimension": "任务完成度", "score": 17, "maxScore": 20, "comment": "简短评价"}
+  ],
+  "issues": [
+    {
+      "location": "问题所在位置（如开头段/主体段第1句/结尾段）",
+      "original": "用户的原文片段",
+      "problem": "具体问题说明（语法错误/用词不当/逻辑不清/偏离主题等）",
+      "suggestion": "修改建议（给出具体的英文改写方式）",
+      "suggestionZh": "修改建议的中文释义"
+    }
+  ],
+  "improvedVersion": {
+    "paragraphs": [
+      {
+        "en": "开头段英文内容",
+        "zh": "开头段中文翻译"
+      },
+      {
+        "en": "主体段英文内容",
+        "zh": "主体段中文翻译"
+      },
+      {
+        "en": "结尾段英文内容",
+        "zh": "结尾段中文翻译"
+      }
+    ]
+  },
+  "overallComment": "总体评价与学习建议（2-3句话，先肯定优点再指出不足，语气鼓励）"
+}
+
+注意：
+- 评分符合${examName}写作评分标准
+- issues 列出 4-6 条主要问题，涵盖语法、词汇、结构、内容等方面，每条给出英文修改建议和对应的中文释义
+- improvedVersion.paragraphs 分段给出修改后范文，每段含 en（英文）和 zh（中文翻译），通常 3-4 段
+- overallComment 先肯定做得好的地方，再指出最需要改进的方向
+- 必须返回有效的 JSON，不要包含任何 JSON 之外的内容`;
+        }
+
         // ==================== 中译英发送 ====================
         async function sendTranslateQuery(text) {
+          const mode = state.currentMode; // 捕获当前模式，防止异步期间切换导致消息串位
+          const isIntensive = state.translationSubMode === 'intensive-reading';
           state.messages.push({
             id: genId('m'),
             role: 'user',
             type: 'query',
-            mode: state.currentMode,
+            mode: mode,
             content: text,
             time: new Date().toISOString(),
             showTime: state.messages.length > 0
@@ -1854,7 +3012,7 @@ ${keywordLine}
             id: genId('m'),
             role: 'ai',
             type: 'loading',
-            mode: state.currentMode,
+            mode: mode,
             content: '',
             time: new Date().toISOString(),
             showTime: false
@@ -1864,25 +3022,51 @@ ${keywordLine}
           scrollToBottom();
 
           try {
-            const systemPrompt = buildTranslatePrompt();
-            const result = await callDeepSeek(systemPrompt, `用户输入：${text}`);
+            if (isIntensive) {
+              // ===== 精读模式：一步输出 =====
+              const systemPrompt = buildIntensiveReadingPrompt('translate');
+              const result = await callDeepSeek(systemPrompt, `用户输入：${text}`);
+              addTranslateIntensiveToHistory(text, result, mode);
+              saveFolders();
+              const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
+              if (loadingIndex !== -1) {
+                state.messages[loadingIndex] = {
+                  id: genId('m'),
+                  role: 'ai',
+                  type: 'intensive-reading-result',
+                  mode: mode,
+                  content: result,
+                  queryText: text,
+                  time: new Date().toISOString(),
+                  showTime: false
+                };
+              }
+            } else {
+              // ===== 原有两步交互流程 =====
+              const systemPrompt = buildTranslatePrompt();
+              const result = await callDeepSeek(systemPrompt, `用户输入：${text}`);
 
-            // 每次新建翻译记录（不累计）
-            addTranslateToHistory(text, result.basicVersions, result.advancedVersions, result.analysis);
-            saveFolders();
-
-            const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
-            if (loadingIndex !== -1) {
-              state.messages[loadingIndex] = {
-                id: genId('m'),
-                role: 'ai',
-                type: 'translate-result',
-                mode: state.currentMode,
-                content: result,
-                queryText: text,
-                time: new Date().toISOString(),
-                showTime: false
+              // 保存完整结果（含示例译文），先展示解析卡片
+              state.translateContext = {
+                text: text,
+                analysis: result.analysis,
+                translationPairs: result.translationPairs
               };
+              state.postAnalysisAction = null;
+
+              const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
+              if (loadingIndex !== -1) {
+                state.messages[loadingIndex] = {
+                  id: genId('m'),
+                  role: 'ai',
+                  type: 'translate-analysis',
+                  mode: mode,
+                  content: result,
+                  queryText: text,
+                  time: new Date().toISOString(),
+                  showTime: false
+                };
+              }
             }
           } catch (err) {
             const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
@@ -1891,7 +3075,7 @@ ${keywordLine}
                 id: genId('m'),
                 role: 'ai',
                 type: 'error',
-                mode: state.currentMode,
+                mode: mode,
                 content: err.message || '请求失败，请稍后重试',
                 time: new Date().toISOString(),
                 showTime: false
@@ -1905,11 +3089,13 @@ ${keywordLine}
 
         // ==================== 英译中发送 ====================
         async function sendEnToCnQuery(text) {
+          const mode = state.currentMode; // 捕获当前模式，防止异步期间切换导致消息串位
+          const isIntensive = state.translationSubMode === 'intensive-reading';
           state.messages.push({
             id: genId('m'),
             role: 'user',
             type: 'query',
-            mode: state.currentMode,
+            mode: mode,
             content: text,
             time: new Date().toISOString(),
             showTime: state.messages.length > 0
@@ -1919,7 +3105,7 @@ ${keywordLine}
             id: genId('m'),
             role: 'ai',
             type: 'loading',
-            mode: state.currentMode,
+            mode: mode,
             content: '',
             time: new Date().toISOString(),
             showTime: false
@@ -1929,24 +3115,51 @@ ${keywordLine}
           scrollToBottom();
 
           try {
-            const systemPrompt = buildEnToCnPrompt();
-            const result = await callDeepSeek(systemPrompt, `用户输入：${text}`);
+            if (isIntensive) {
+              // ===== 精读模式：一步输出 =====
+              const systemPrompt = buildIntensiveReadingPrompt('en-to-cn');
+              const result = await callDeepSeek(systemPrompt, `用户输入：${text}`);
+              addTranslateIntensiveToHistory(text, result, mode);
+              saveFolders();
+              const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
+              if (loadingIndex !== -1) {
+                state.messages[loadingIndex] = {
+                  id: genId('m'),
+                  role: 'ai',
+                  type: 'intensive-reading-result',
+                  mode: mode,
+                  content: result,
+                  queryText: text,
+                  time: new Date().toISOString(),
+                  showTime: false
+                };
+              }
+            } else {
+              // ===== 原有两步交互流程 =====
+              const systemPrompt = buildEnToCnPrompt();
+              const result = await callDeepSeek(systemPrompt, `用户输入：${text}`);
 
-            addTranslateToHistory(text, result.basicVersions, result.advancedVersions, result.analysis);
-            saveFolders();
-
-            const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
-            if (loadingIndex !== -1) {
-              state.messages[loadingIndex] = {
-                id: genId('m'),
-                role: 'ai',
-                type: 'en-to-cn-result',
-                mode: state.currentMode,
-                content: result,
-                queryText: text,
-                time: new Date().toISOString(),
-                showTime: false
+              // 保存完整结果（含示例译文），先展示解析卡片
+              state.translateContext = {
+                text: text,
+                analysis: result.analysis,
+                translationPairs: result.translationPairs
               };
+              state.postAnalysisAction = null;
+
+              const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
+              if (loadingIndex !== -1) {
+                state.messages[loadingIndex] = {
+                  id: genId('m'),
+                  role: 'ai',
+                  type: 'translate-analysis',
+                  mode: mode,
+                  content: result,
+                  queryText: text,
+                  time: new Date().toISOString(),
+                  showTime: false
+                };
+              }
             }
           } catch (err) {
             const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
@@ -1955,7 +3168,7 @@ ${keywordLine}
                 id: genId('m'),
                 role: 'ai',
                 type: 'error',
-                mode: state.currentMode,
+                mode: mode,
                 content: err.message || '请求失败，请稍后重试',
                 time: new Date().toISOString(),
                 showTime: false
@@ -1969,11 +3182,13 @@ ${keywordLine}
 
         // ==================== 大作文发送（第一步：题目解析） ====================
         async function sendEssayTopicQuery(topic) {
+          const mode = state.currentMode; // 捕获当前模式，防止异步期间切换导致消息串位
+          const analysisMsgType = examConfig.value.modes[mode]?.analysisMsgType || 'essay-analysis';
           state.messages.push({
             id: genId('m'),
             role: 'user',
             type: 'query',
-            mode: state.currentMode,
+            mode: mode,
             content: topic,
             time: new Date().toISOString(),
             showTime: state.messages.length > 0
@@ -1983,7 +3198,7 @@ ${keywordLine}
             id: genId('m'),
             role: 'ai',
             type: 'loading',
-            mode: state.currentMode,
+            mode: mode,
             content: '',
             time: new Date().toISOString(),
             showTime: false
@@ -2004,8 +3219,8 @@ ${keywordLine}
               state.messages[loadingIndex] = {
                 id: genId('m'),
                 role: 'ai',
-                type: currentModeConfig.value.analysisMsgType || 'essay-analysis',
-                mode: state.currentMode,
+                type: analysisMsgType,
+                mode: mode,
                 content: result,
                 queryText: topic,
                 time: new Date().toISOString(),
@@ -2019,7 +3234,7 @@ ${keywordLine}
                 id: genId('m'),
                 role: 'ai',
                 type: 'error',
-                mode: state.currentMode,
+                mode: mode,
                 content: err.message || '请求失败，请稍后重试',
                 time: new Date().toISOString(),
                 showTime: false
@@ -2057,6 +3272,7 @@ ${keywordLine}
 
         function resetEssayFormData() {
           Object.keys(state.essayFormData).forEach(k => { state.essayFormData[k] = ''; });
+          state.essayFormData.longEssayType = 'picture';
         }
 
         function submitEssayForm(mode) {
@@ -2071,6 +3287,107 @@ ${keywordLine}
           sendEssayWithKeywords(combinedKeywords || '');
         }
 
+        // ==================== 考研大作文表单确认 → AI 分析 ====================
+        function buildLongEssayTopicFromForm() {
+          const fd = state.essayFormData;
+          const isPic = fd.longEssayType === 'picture';
+
+          const parts = [];
+          parts.push(`作文类型：${isPic ? '图画作文' : '图表作文'}`);
+
+          if (isPic) {
+            if (fd.subjects) parts.push(`人物/主体：${fd.subjects}`);
+            if (fd.action) parts.push(`动作/场景：${fd.action}`);
+            if (fd.meaning) parts.push(`反映寓意：${fd.meaning}`);
+          } else {
+            if (fd.chartType) parts.push(`图表类型：${fd.chartType}`);
+            if (fd.chartTitle) parts.push(`标题/主题：${fd.chartTitle}`);
+            if (fd.dataPoints) parts.push(`关键数据：${fd.dataPoints}`);
+            if (fd.trend) parts.push(`整体趋势：${fd.trend}`);
+            if (fd.phenomenon) parts.push(`反映现象：${fd.phenomenon}`);
+          }
+
+          if (fd.description) parts.push(`\n整体描述：${fd.description}`);
+
+          return parts.join('\n');
+        }
+
+        async function submitLongEssayForm() {
+          if (state.isSending) return;
+
+          const topic = buildLongEssayTopicFromForm();
+          if (!topic) {
+            showToast('请至少填写一项内容或拍照识图', 'error');
+            return;
+          }
+
+          state.isSending = true;
+          resetEssayFormData();
+
+          const mode = state.currentMode;
+          const analysisMsgType = 'long-essay-analysis';
+
+          state.messages.push({
+            id: genId('m'),
+            role: 'user',
+            type: 'query',
+            mode: mode,
+            content: topic,
+            time: new Date().toISOString(),
+            showTime: state.messages.length > 0
+          });
+
+          const loadingMsg = {
+            id: genId('m'),
+            role: 'ai',
+            type: 'loading',
+            mode: mode,
+            content: '',
+            time: new Date().toISOString(),
+            showTime: false
+          };
+          state.messages.push(loadingMsg);
+          scrollToBottom();
+
+          try {
+            const systemPrompt = buildLongEssayTopicPrompt();
+            const result = await callDeepSeek(systemPrompt, `大作文题目描述：${topic}`);
+
+            // 保存解析结果，等待用户操作
+            state.essayContext = { topic, analysis: result.topicAnalysis };
+
+            const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
+            if (loadingIndex !== -1) {
+              state.messages[loadingIndex] = {
+                id: genId('m'),
+                role: 'ai',
+                type: analysisMsgType,
+                mode: mode,
+                content: result,
+                queryText: topic,
+                time: new Date().toISOString(),
+                showTime: false
+              };
+            }
+          } catch (err) {
+            const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
+            if (loadingIndex !== -1) {
+              state.messages[loadingIndex] = {
+                id: genId('m'),
+                role: 'ai',
+                type: 'error',
+                mode: mode,
+                content: err.message || '请求失败，请稍后重试',
+                time: new Date().toISOString(),
+                showTime: false
+              };
+            }
+          } finally {
+            state.isSending = false;
+            scrollToBottom();
+          }
+        }
+
         async function sendEssayWithKeywords(keywords) {
           const ctx = state.essayContext;
           if (!ctx) {
@@ -2078,12 +3395,15 @@ ${keywordLine}
             return;
           }
 
+          const mode = state.currentMode; // 捕获当前模式，防止异步期间切换导致消息串位
+          const resultMsgType = examConfig.value.modes[mode]?.resultMsgType || 'essay-result';
+
           const keywordDisplay = keywords || '（无特定关键词）';
           state.messages.push({
             id: genId('m'),
             role: 'user',
             type: 'query',
-            mode: state.currentMode,
+            mode: mode,
             content: keywords ? `关键词：${keywords}` : '直接生成模板',
             time: new Date().toISOString(),
             showTime: state.messages.length > 0
@@ -2093,7 +3413,7 @@ ${keywordLine}
             id: genId('m'),
             role: 'ai',
             type: 'loading',
-            mode: state.currentMode,
+            mode: mode,
             content: '',
             time: new Date().toISOString(),
             showTime: false
@@ -2107,7 +3427,7 @@ ${keywordLine}
             const result = await callDeepSeek(systemPrompt, `请为以下题目生成写作模板：${ctx.topic}`);
 
             // 每次新建作文记录（不累计）
-            addEssayToHistory(ctx.topic, result.basicTemplate, result.advancedTemplate, result.keywordsUsed);
+            addEssayToHistory(ctx.topic, result.basicTemplate, result.advancedTemplate, result.keywordsUsed, ctx.analysis);
             saveFolders();
 
             const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
@@ -2115,8 +3435,8 @@ ${keywordLine}
               state.messages[loadingIndex] = {
                 id: genId('m'),
                 role: 'ai',
-                type: currentModeConfig.value.resultMsgType || 'essay-result',
-                mode: state.currentMode,
+                type: resultMsgType,
+                mode: mode,
                 content: result,
                 queryText: ctx.topic,
                 time: new Date().toISOString(),
@@ -2133,7 +3453,156 @@ ${keywordLine}
                 id: genId('m'),
                 role: 'ai',
                 type: 'error',
+                mode: mode,
+                content: err.message || '请求失败，请稍后重试',
+                time: new Date().toISOString(),
+                showTime: false
+              };
+            }
+          } finally {
+            state.isSending = false;
+            scrollToBottom();
+          }
+        }
+
+        // ==================== 解析后操作选择 ====================
+        function choosePostAnalysisAction(action) {
+          state.postAnalysisAction = action;
+
+          if (action === 'generate') {
+            const mc = currentModeConfig.value;
+            if (mc.isTranslationMode) {
+              // 翻译——直接生成：立即展示缓存的示例译文
+              const ctx = state.translateContext;
+              if (!ctx) return;
+
+              // 加入历史记录
+              addTranslateToHistory(ctx.text, ctx.translationPairs, ctx.analysis);
+              saveFolders();
+
+              // 添加结果消息
+              const resultType = state.currentMode === 'translate' ? 'translate-result' : 'en-to-cn-result';
+              state.messages.push({
+                id: genId('m'),
+                role: 'ai',
+                type: resultType,
                 mode: state.currentMode,
+                content: {
+                  analysis: ctx.analysis,
+                  translationPairs: ctx.translationPairs
+                },
+                queryText: ctx.text,
+                time: new Date().toISOString(),
+                showTime: false
+              });
+
+              state.translateContext = null;
+              state.postAnalysisAction = null;
+              scrollToBottom();
+            }
+            // 作文模式：在气泡内展示关键词引导，由模板的 v-if 控制
+          }
+
+          if (action === 'grade') {
+            // 切换到底部输入栏，用户直接输入译文/作文后回车提交
+            scrollToBottom();
+          }
+        }
+
+        // ==================== 提交批改 ====================
+        async function submitGrading(answer) {
+          if (!answer || !answer.trim()) {
+            showToast('请先输入你的译文/作文', 'error');
+            return;
+          }
+
+          if (!localStorage.getItem(STORAGE_KEY_API)) {
+            showToast('请先设置 API Key', 'error');
+            state.showSettings = true;
+            return;
+          }
+
+          const mode = state.currentMode; // 捕获当前模式，防止异步期间切换导致消息串位
+          const mc = examConfig.value.modes[mode];
+          state.isSending = true;
+
+          // 将用户提交的译文/作文保存为消息展示
+          state.messages.push({
+            id: genId('m'),
+            role: 'user',
+            type: 'query',
+            mode: mode,
+            content: answer,
+            time: new Date().toISOString(),
+            showTime: state.messages.length > 0
+          });
+
+          const loadingMsg = {
+            id: genId('m'),
+            role: 'ai',
+            type: 'loading',
+            mode: mode,
+            content: '',
+            time: new Date().toISOString(),
+            showTime: false
+          };
+          state.messages.push(loadingMsg);
+          scrollToBottom();
+
+          try {
+            let systemPrompt, userMessage;
+
+            if (mc.isTranslationMode) {
+              const ctx = state.translateContext;
+              const isEnToCn = mode === 'en-to-cn';
+              systemPrompt = buildTranslateGradePrompt(isEnToCn);
+              const sourceLabel = isEnToCn ? '英文原文' : '中文原文';
+              const analysisText = ctx.analysis.segments
+                ? ctx.analysis.segments.map(s => `【${s.original}】\n结构：${s.structure}\n要点：${s.approach}`).join('\n\n')
+                : `句子结构：${ctx.analysis.structure}\n翻译思路：${ctx.analysis.approach}`;
+              userMessage = `${sourceLabel}：${ctx.text}\n\n解析：\n${analysisText}\n\n用户译文：\n${answer}`;
+            } else if (mc.isEssayMode) {
+              const ctx = state.essayContext;
+              systemPrompt = buildEssayGradePrompt();
+              const analysisSummary = ctx.analysis
+                ? `类型：${ctx.analysis.type || ''}\n要点：${(ctx.analysis.keyPoints || []).join('；')}\n结构：${ctx.analysis.structure || ctx.analysis.format || ''}`
+                : '';
+              userMessage = `作文题目：${ctx.topic}\n\n题目解析：\n${analysisSummary}\n\n用户作文：\n${answer}`;
+            }
+
+            const result = await callDeepSeek(systemPrompt, userMessage);
+
+            const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
+            if (loadingIndex !== -1) {
+              state.messages[loadingIndex] = {
+                id: genId('m'),
+                role: 'ai',
+                type: mc.isTranslationMode ? 'translate-grade-result' : 'essay-grade-result',
+                mode: mode,
+                content: result,
+                queryText: mc.isTranslationMode ? state.translateContext?.text : state.essayContext?.topic,
+                time: new Date().toISOString(),
+                showTime: false
+              };
+            }
+
+            // 写入历史记录
+            addGradingToHistory(answer, result, mode, mc);
+            saveFolders();
+
+            // 清理上下文
+            state.translateContext = null;
+            state.essayContext = null;
+            state.postAnalysisAction = null;
+
+          } catch (err) {
+            const loadingIndex = state.messages.findIndex(m => m.id === loadingMsg.id);
+            if (loadingIndex !== -1) {
+              state.messages[loadingIndex] = {
+                id: genId('m'),
+                role: 'ai',
+                type: 'error',
+                mode: mode,
                 content: err.message || '请求失败，请稍后重试',
                 time: new Date().toISOString(),
                 showTime: false
@@ -2229,7 +3698,7 @@ ${keywordLine}
           return folder.history.find(h => h.type === 'essay' && h.topic === topic);
         }
 
-        function addToHistory(word, cetFrequency, cetFrequencyScore, meaning) {
+        function addToHistory(word, cetFrequency, cetFrequencyScore, meaning, lastResult) {
           const folder = currentFolder.value;
           if (!folder) return;
           if (!folder.history) folder.history = [];
@@ -2240,19 +3709,19 @@ ${keywordLine}
             cetFrequency: cetFrequency,
             cetFrequencyScore: cetFrequencyScore,
             meaning: meaning,
+            lastResult: lastResult,
             firstQuery: new Date().toISOString(),
             lastQuery: new Date().toISOString()
           });
         }
 
-        function addTranslateToHistory(text, basicVersions, advancedVersions, analysis) {
+        function addTranslateToHistory(text, translationPairs, analysis) {
           const folder = currentFolder.value;
           if (!folder) return;
           if (!folder.history) folder.history = [];
           const entry = {
             type: state.currentMode,
-            basicVersions: basicVersions,
-            advancedVersions: advancedVersions,
+            translationPairs: translationPairs,
             analysis: analysis,
             count: 1,
             firstQuery: new Date().toISOString(),
@@ -2264,7 +3733,27 @@ ${keywordLine}
           folder.history.push(entry);
         }
 
-        function addEssayToHistory(topic, basicTemplate, advancedTemplate, keywordsUsed) {
+        function addTranslateIntensiveToHistory(text, result, mode) {
+          const folder = currentFolder.value;
+          if (!folder) return;
+          if (!folder.history) folder.history = [];
+          const entry = {
+            type: mode,
+            subMode: 'intensive-reading',
+            fullTranslation: result.fullTranslation,
+            sentenceAnalysis: result.sentenceAnalysis,
+            keyVocabulary: result.keyVocabulary,
+            difficultSentences: result.difficultSentences,
+            count: 1,
+            firstQuery: new Date().toISOString(),
+            lastQuery: new Date().toISOString()
+          };
+          const field = currentModeConfig.value.translationField || 'chineseText';
+          entry[field] = text;
+          folder.history.push(entry);
+        }
+
+        function addEssayToHistory(topic, basicTemplate, advancedTemplate, keywordsUsed, analysis) {
           const folder = currentFolder.value;
           if (!folder) return;
           if (!folder.history) folder.history = [];
@@ -2274,10 +3763,43 @@ ${keywordLine}
             basicTemplate: basicTemplate,
             advancedTemplate: advancedTemplate,
             keywordsUsed: keywordsUsed,
+            analysis: analysis,
             count: 1,
             firstQuery: new Date().toISOString(),
             lastQuery: new Date().toISOString()
           });
+        }
+
+        // 批改记录写入历史
+        function addGradingToHistory(answer, gradeResult, mode, mc) {
+          const folder = currentFolder.value;
+          if (!folder) return;
+          if (!folder.history) folder.history = [];
+          const entry = {
+            type: mode,
+            count: 1,
+            firstQuery: new Date().toISOString(),
+            lastQuery: new Date().toISOString(),
+            gradeRecord: {
+              userAnswer: answer,
+              overallScore: gradeResult.overallScore,
+              scoreBreakdown: gradeResult.scoreBreakdown,
+              issues: gradeResult.issues,
+              improvedVersion: gradeResult.improvedVersion,
+              overallComment: gradeResult.overallComment,
+              gradedAt: new Date().toISOString()
+            }
+          };
+          // 翻译模式：存原文+解析；作文模式：存题目+解析
+          if (mc.isTranslationMode) {
+            const field = mc.translationField || 'chineseText';
+            entry[field] = state.translateContext?.text || '';
+            entry.analysis = state.translateContext?.analysis || null;
+          } else {
+            entry.topic = state.essayContext?.topic || '';
+            entry.analysis = state.essayContext?.analysis || null;
+          }
+          folder.history.push(entry);
         }
 
         // ==================== 删除单条历史记录 ====================
@@ -2302,6 +3824,13 @@ ${keywordLine}
             return;
           }
           localStorage.setItem(STORAGE_KEY_API, key);
+
+          // 同时保存视觉识别 Key（如有输入）
+          const ocrKey = state.ocrApiKey.trim();
+          if (ocrKey) {
+            localStorage.setItem(STORAGE_KEY_OCR, ocrKey);
+          }
+
           showToast('✅ 保存成功');
           setTimeout(() => {
             state.showSettings = false;
@@ -2316,7 +3845,9 @@ ${keywordLine}
 
         function clearApiKey() {
           localStorage.removeItem(STORAGE_KEY_API);
+          localStorage.removeItem(STORAGE_KEY_OCR);
           state.apiKey = '';
+          state.ocrApiKey = '';
           showToast('API Key 已清除');
         }
 
@@ -2354,43 +3885,425 @@ ${keywordLine}
           }
         }
 
+        // ==================== 导出全部数据（Markdown） ====================
+        function exportAllData() {
+          const lines = [];
+          const now = new Date();
+          lines.push(`# 英语学习助手 — 全部数据导出`);
+          lines.push(`> 导出时间：${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
+          lines.push('');
+
+          const examDefs = [
+            { key: 'cet6', label: '六级', storageKey: STORAGE_KEY_CET6, freqLabel: '六级' },
+            { key: 'postgrad', label: '考研', storageKey: STORAGE_KEY_POSTGRAD, freqLabel: '考研' }
+          ];
+
+          for (const exam of examDefs) {
+            const raw = localStorage.getItem(exam.storageKey);
+            if (!raw) continue;
+            let data;
+            try { data = JSON.parse(raw); } catch (e) { continue; }
+            const folders = data.folders || [];
+            if (folders.length === 0) continue;
+
+            lines.push(`---`);
+            lines.push('');
+            lines.push(`# 📚 ${exam.label}`);
+            lines.push('');
+
+            for (const folder of folders) {
+              const history = folder.history || [];
+              lines.push(`## 📂 ${folder.name}`);
+              lines.push(`> 创建于 ${folder.createdAt ? new Date(folder.createdAt).toLocaleString('zh-CN') : '未知'} · 共 ${history.length} 条记录`);
+              lines.push('');
+
+              // 分类汇总
+              const vocabItems = history.filter(h => h.type === 'vocab' || !h.type);
+              const translateItems = history.filter(h => h.type === 'translate' || h.type === 'en-to-cn');
+              const essayItems = history.filter(h => h.type === 'essay' || h.type === 'short-essay' || h.type === 'long-essay');
+
+              // --- 词汇 ---
+              if (vocabItems.length > 0) {
+                lines.push(`### 📖 词汇（${vocabItems.length} 条）`);
+                lines.push('');
+                lines.push('| 频率 | 单词 | 释义 | 查询次数 |');
+                lines.push('|------|------|------|----------|');
+                const sortedVocab = [...vocabItems].sort((a, b) => b.count - a.count);
+                for (const v of sortedVocab) {
+                  const freqIcon = v.cetFrequency === '高频' ? '🔴' : v.cetFrequency === '中频' ? '🟡' : '🟢';
+                  const meaning = (v.meaning || '').replace(/\|/g, '、');
+                  lines.push(`| ${freqIcon} ${v.cetFrequency || '未知'} | ${v.word || ''} | ${meaning} | ${v.count || 1} |`);
+                }
+                lines.push('');
+              }
+
+              // --- 翻译（全部内容） ---
+              if (translateItems.length > 0) {
+                const label = translateItems[0]?.type === 'en-to-cn' ? '英译中' : '翻译';
+                lines.push(`### 🈂️ ${label}（${translateItems.length} 条）`);
+                lines.push('');
+                const sortedTrans = [...translateItems].sort((a, b) => new Date(b.lastQuery) - new Date(a.lastQuery));
+                for (let i = 0; i < sortedTrans.length; i++) {
+                  const t = sortedTrans[i];
+                  const time = t.lastQuery ? new Date(t.lastQuery).toLocaleString('zh-CN') : '未知';
+                  lines.push(`#### ${i + 1}. ${t.chineseText || t.englishText || '(无原文)'}`);
+                  lines.push(`> ${time}`);
+                  lines.push('');
+
+                  // 精读记录导出
+                  if (t.subMode === 'intensive-reading') {
+                    lines.push('**📖 精读分析**');
+                    lines.push('');
+                    if (t.fullTranslation) {
+                      lines.push('**全文翻译**');
+                      lines.push(`> ${t.fullTranslation}`);
+                      lines.push('');
+                    }
+                    if (t.sentenceAnalysis && t.sentenceAnalysis.length > 0) {
+                      lines.push('**逐句对照**');
+                      t.sentenceAnalysis.forEach((sa, si) => {
+                        lines.push(`${si + 1}. ${sa.original}`);
+                        lines.push(`   → ${sa.translation}`);
+                        lines.push(`   句式：${sa.structure}`);
+                      });
+                      lines.push('');
+                    }
+                    if (t.keyVocabulary && t.keyVocabulary.length > 0) {
+                      lines.push('**核心词汇**');
+                      t.keyVocabulary.forEach(kv => {
+                        lines.push(`- ${kv.word} ${kv.pos ? '(' + kv.pos + ')' : ''} ${kv.pronunciation || ''}：${kv.meaning}`);
+                        if (kv.example) lines.push(`  例：${kv.example}`);
+                      });
+                      lines.push('');
+                    }
+                    if (t.difficultSentences && t.difficultSentences.length > 0) {
+                      lines.push('**长难句精析**');
+                      t.difficultSentences.forEach(ds => {
+                        lines.push(`- ${ds.sentence}`);
+                        lines.push(`  结构：${ds.analysis}`);
+                        lines.push(`  译文：${ds.translation}`);
+                      });
+                      lines.push('');
+                    }
+                  }
+
+                  // 题目解析（非精读记录）
+                  if (t.analysis && (t.analysis.structure || t.analysis.approach)) {
+                    lines.push('**📝 题目解析**');
+                    if (t.analysis.structure) lines.push(`- 句子结构：${t.analysis.structure}`);
+                    if (t.analysis.approach) lines.push(`- 翻译思路：${t.analysis.approach}`);
+                    lines.push('');
+                  }
+
+                  // 翻译对照（优先新格式 translationPairs）
+                  if (t.translationPairs && t.translationPairs.length > 0) {
+                    for (const tp of t.translationPairs) {
+                      lines.push(`**原文**：${tp.original}`);
+                      // 简单版（兼容数组和单对象）
+                      const basics = tp.basicVersions || (tp.basic ? [tp.basic] : []);
+                      basics.forEach((bv, bi) => {
+                        lines.push(`  📗 简单${basics.length > 1 ? ' '+(bi+1) : ''}：${bv.text || ''}`);
+                        if (bv.score || bv.tips) lines.push(`    🏆 ${bv.score || ''} · ${bv.tips || ''}`);
+                      });
+                      // 进阶版（兼容数组和单对象）
+                      const advanceds = tp.advancedVersions || (tp.advanced ? [tp.advanced] : []);
+                      advanceds.forEach((av, ai) => {
+                        lines.push(`  📘 进阶${advanceds.length > 1 ? ' '+(ai+1) : ''}：${av.text || ''}`);
+                        if (av.highlights && av.highlights.length > 0) lines.push(`    ✨ ${av.highlights.join('；')}`);
+                        if (av.knowledgePoints && av.knowledgePoints.length > 0) lines.push(`    📚 ${av.knowledgePoints.join('；')}`);
+                      });
+                    }
+                    lines.push('');
+                  } else {
+                    if (t.basicVersions && t.basicVersions.length > 0) {
+                      lines.push('**📗 简单拿分版**');
+                      for (const bv of t.basicVersions) {
+                        lines.push(`- ${bv.en || bv.zh || ''}`);
+                        if (bv.score || bv.tips) lines.push(`  🏆 ${bv.score || ''} · ${bv.tips || ''}`);
+                      }
+                      lines.push('');
+                    }
+                    if (t.advancedVersions && t.advancedVersions.length > 0) {
+                      lines.push('**📘 进阶高分版**');
+                      for (const av of t.advancedVersions) {
+                        lines.push(`- ${av.en || av.zh || ''}`);
+                        if (av.highlights && av.highlights.length > 0) lines.push(`  ✨ ${av.highlights.join('；')}`);
+                        if (av.knowledgePoints && av.knowledgePoints.length > 0) lines.push(`  📚 ${av.knowledgePoints.join('；')}`);
+                      }
+                      lines.push('');
+                    }
+                  }
+                }
+              }
+
+              // --- 作文（全部内容） ---
+              if (essayItems.length > 0) {
+                const labelMap = { 'short-essay': '小作文', 'long-essay': '大作文', 'essay': '大作文' };
+                lines.push(`### 📝 作文（${essayItems.length} 条）`);
+                lines.push('');
+                const sortedEssay = [...essayItems].sort((a, b) => new Date(b.lastQuery) - new Date(a.lastQuery));
+                for (let i = 0; i < sortedEssay.length; i++) {
+                  const e = sortedEssay[i];
+                  const typeLabel = labelMap[e.type] || '作文';
+                  const time = e.lastQuery ? new Date(e.lastQuery).toLocaleString('zh-CN') : '未知';
+                  lines.push(`#### ${i + 1}. [${typeLabel}] ${e.topic || '(无题目)'}`);
+                  lines.push(`> ${time}`);
+                  if (e.keywordsUsed && e.keywordsUsed.length > 0) {
+                    lines.push(`> 关键词：${e.keywordsUsed.join('、')}`);
+                  }
+                  lines.push('');
+
+                  // 简单版模板全部段落
+                  if (e.basicTemplate && e.basicTemplate.paragraphs) {
+                    lines.push('**📗 简单版模板**');
+                    lines.push('');
+                    for (const p of e.basicTemplate.paragraphs) {
+                      lines.push(`**${p.section}**`);
+                      lines.push(`> ${(p.en || '').replace(/\n/g, '\n> ')}`);
+                      lines.push('');
+                      lines.push(`「${p.zh || ''}」`);
+                      if (p.knowledge) lines.push(`📚 ${p.knowledge}`);
+                      lines.push('');
+                    }
+                  }
+
+                  // 进阶版模板全部段落
+                  if (e.advancedTemplate && e.advancedTemplate.paragraphs) {
+                    lines.push('**📘 进阶版模板**');
+                    lines.push('');
+                    for (const p of e.advancedTemplate.paragraphs) {
+                      lines.push(`**${p.section}**`);
+                      lines.push(`> ${(p.en || '').replace(/\n/g, '\n> ')}`);
+                      lines.push('');
+                      lines.push(`「${p.zh || ''}」`);
+                      if (p.knowledge) lines.push(`📚 ${p.knowledge}`);
+                      lines.push('');
+                    }
+                  }
+                }
+              }
+
+              // 文件夹无记录
+              if (history.length === 0) {
+                lines.push('*该文件夹暂无记录*');
+                lines.push('');
+              }
+            }
+          }
+
+          // 生成文件并下载
+          const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          const dateStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+          a.download = `英语学习助手_数据导出_${dateStr}.md`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('✅ 导出成功');
+        }
+
+        function clearAllData() {
+          showConfirm('确定清除全部数据？这将删除所有考试类型的文件夹、学习记录和 API Key。建议先导出备份。', () => {
+            localStorage.removeItem(STORAGE_KEY_API);
+            localStorage.removeItem(STORAGE_KEY_OCR);
+            localStorage.removeItem(STORAGE_KEY_EXAM_TYPE);
+            localStorage.removeItem(STORAGE_KEY_CET6);
+            localStorage.removeItem(STORAGE_KEY_POSTGRAD);
+            localStorage.removeItem('cet6-folders'); // 旧 key 也清理
+            showToast('全部数据已清除');
+            setTimeout(() => { location.reload(); }, 800);
+          });
+        }
+
         // ==================== 汇总视图 ====================
         function openSummary() {
           state.currentView = 'summary';
           state.showFolderDropdown = false;
         }
 
-        function queryFromSummary(word) {
+        // ==================== 历史记录重建（不调 API） ====================
+        function queryFromSummary(item) {
           state.currentView = 'chat';
           state.currentMode = 'vocab';
           state.essayContext = null;
-          state.inputText = word;
-          nextTick(() => {
-            handleSend();
+          state.translateContext = null;
+          state.postAnalysisAction = null;
+
+          // 无完整结果时回退到 API 查询
+          if (!item.lastResult) {
+            state.inputText = item.word;
+            nextTick(() => { handleSend(); });
+            return;
+          }
+
+          state.messages = [];
+          state.messages.push({
+            id: genId('m'), role: 'user', type: 'query', mode: 'vocab',
+            content: item.word, time: item.lastQuery, showTime: false
           });
+          state.messages.push({
+            id: genId('m'), role: 'ai', type: 'result', mode: 'vocab',
+            content: {
+              spellCheck: item.lastResult.spellCheck,
+              definition: item.lastResult.definition,
+              cetFrequency: item.lastResult.cetFrequency,
+              extension: item.lastResult.extension,
+              historyNote: `📝 历史记录 · 累计查询 ${item.count} 次`
+            },
+            queryText: item.word, time: item.lastQuery, showTime: false
+          });
+          scrollToBottom();
         }
 
-        function queryTranslateFromSummary(text) {
+        function queryTranslateFromSummary(item) {
+          const mode = item.type === 'en-to-cn' ? 'en-to-cn' : 'translate';
           state.currentView = 'chat';
-          // 根据当前 summaryTab 确定要切换到的模式
-          state.currentMode = state.summaryTab === 'en-to-cn' ? 'en-to-cn' : 'translate';
+          state.currentMode = mode;
           state.essayContext = null;
-          state.inputText = text;
-          nextTick(() => {
-            handleSend();
-          });
+          state.translateContext = null;
+          state.postAnalysisAction = null;
+          state.messages = [];
+
+          const queryText = item.chineseText || item.englishText || '';
+
+          // 精读记录：恢复为精读气泡
+          if (item.subMode === 'intensive-reading') {
+            state.translationSubMode = 'intensive-reading';
+            state.messages.push({
+              id: genId('m'), role: 'user', type: 'query', mode: mode,
+              content: queryText, time: item.lastQuery, showTime: false
+            });
+            state.messages.push({
+              id: genId('m'), role: 'ai', type: 'intensive-reading-result', mode: mode,
+              content: {
+                fullTranslation: item.fullTranslation,
+                sentenceAnalysis: item.sentenceAnalysis,
+                keyVocabulary: item.keyVocabulary,
+                difficultSentences: item.difficultSentences,
+                historyNote: `📝 历史记录 · 精读分析 · 累计 ${item.count || 1} 次`
+              },
+              queryText: queryText, time: item.lastQuery, showTime: false
+            });
+            scrollToBottom();
+            return;
+          }
+
+          // 解析卡片（仅 analysis 有内容时显示）
+          if (item.analysis && (item.analysis.segments?.length > 0 || item.analysis.structure || item.analysis.approach)) {
+            state.messages.push({
+              id: genId('m'), role: 'ai', type: 'translate-analysis', mode: mode,
+              content: { analysis: item.analysis },
+              queryText: queryText, time: item.lastQuery, showTime: false
+            });
+          }
+
+          // 批改记录
+          if (item.gradeRecord) {
+            state.messages.push({
+              id: genId('m'), role: 'user', type: 'query', mode: mode,
+              content: item.gradeRecord.userAnswer,
+              time: item.gradeRecord.gradedAt, showTime: true
+            });
+            state.messages.push({
+              id: genId('m'), role: 'ai', type: 'translate-grade-result', mode: mode,
+              content: {
+                overallScore: item.gradeRecord.overallScore,
+                scoreBreakdown: item.gradeRecord.scoreBreakdown,
+                issues: item.gradeRecord.issues,
+                improvedVersion: item.gradeRecord.improvedVersion,
+                overallComment: item.gradeRecord.overallComment
+              },
+              queryText: queryText, time: item.gradeRecord.gradedAt, showTime: false
+            });
+          }
+
+          // 示例译文（新格式 translationPairs）
+          if (item.translationPairs) {
+            const resultType = mode === 'translate' ? 'translate-result' : 'en-to-cn-result';
+            state.messages.push({
+              id: genId('m'), role: 'ai', type: resultType, mode: mode,
+              content: { analysis: item.analysis, translationPairs: item.translationPairs },
+              queryText: queryText, time: item.lastQuery, showTime: false
+            });
+          }
+          // 兼容旧格式：顶层 basicVersions / advancedVersions
+          else if (item.basicVersions || item.advancedVersions) {
+            const resultType = mode === 'translate' ? 'translate-result' : 'en-to-cn-result';
+            const oldContent = {};
+            if (item.analysis) oldContent.analysis = item.analysis;
+            if (item.basicVersions) oldContent.basicVersions = item.basicVersions;
+            if (item.advancedVersions) oldContent.advancedVersions = item.advancedVersions;
+            if (item.historyNote) oldContent.historyNote = item.historyNote;
+            state.messages.push({
+              id: genId('m'), role: 'ai', type: resultType, mode: mode,
+              content: oldContent,
+              queryText: queryText, time: item.lastQuery, showTime: false
+            });
+          }
+
+          scrollToBottom();
         }
 
-        function queryEssayFromSummary(topic) {
+        function queryEssayFromSummary(item) {
+          const mode = item.type;
+          const essayTypes = {
+            'essay': { analysis: 'essay-analysis', result: 'essay-result' },
+            'short-essay': { analysis: 'short-essay-analysis', result: 'short-essay-result' },
+            'long-essay': { analysis: 'long-essay-analysis', result: 'long-essay-result' }
+          };
+          const types = essayTypes[mode] || { analysis: 'essay-analysis', result: 'essay-result' };
+
           state.currentView = 'chat';
-          // 根据当前 summaryTab 确定要切换到的模式
-          state.currentMode = state.summaryTab === 'short-essay' ? 'short-essay'
-            : state.summaryTab === 'long-essay' ? 'long-essay' : 'essay';
+          state.currentMode = mode;
           state.essayContext = null;
-          state.inputText = topic;
-          nextTick(() => {
-            handleSend();
+          state.translateContext = null;
+          state.postAnalysisAction = null;
+          state.messages = [];
+
+          // 解析卡片
+          state.messages.push({
+            id: genId('m'), role: 'ai', type: types.analysis, mode: mode,
+            content: { topicAnalysis: item.analysis },
+            queryText: item.topic, time: item.lastQuery, showTime: false
           });
+
+          // 批改记录
+          if (item.gradeRecord) {
+            state.messages.push({
+              id: genId('m'), role: 'user', type: 'query', mode: mode,
+              content: item.gradeRecord.userAnswer,
+              time: item.gradeRecord.gradedAt, showTime: true
+            });
+            state.messages.push({
+              id: genId('m'), role: 'ai', type: 'essay-grade-result', mode: mode,
+              content: {
+                overallScore: item.gradeRecord.overallScore,
+                scoreBreakdown: item.gradeRecord.scoreBreakdown,
+                issues: item.gradeRecord.issues,
+                improvedVersion: item.gradeRecord.improvedVersion,
+                overallComment: item.gradeRecord.overallComment
+              },
+              queryText: item.topic, time: item.gradeRecord.gradedAt, showTime: false
+            });
+          }
+
+          // 模板
+          if (item.basicTemplate) {
+            state.messages.push({
+              id: genId('m'), role: 'ai', type: types.result, mode: mode,
+              content: {
+                basicTemplate: item.basicTemplate,
+                advancedTemplate: item.advancedTemplate,
+                keywordsUsed: item.keywordsUsed
+              },
+              queryText: item.topic, time: item.lastQuery, showTime: false
+            });
+          }
+
+          scrollToBottom();
         }
 
         function confirmClearHistory() {
@@ -2414,9 +4327,19 @@ ${keywordLine}
           loadExamType();
           loadFolders();
           loadApiKey();
+          loadOcrApiKey();
           document.title = examConfig.value.title;
           addWelcomeMessage();
           scrollToBottom();
+          // 首次未设置 API Key 时弹出欢迎弹窗
+          if (!localStorage.getItem(STORAGE_KEY_API)) {
+            setTimeout(() => { state.showWelcomeModal = true; }, 500);
+          }
+        }
+
+        function openSettingsFromWelcome() {
+          state.showWelcomeModal = false;
+          setTimeout(() => { state.showSettings = true; }, 300);
         }
 
         onMounted(() => {
@@ -2440,9 +4363,21 @@ ${keywordLine}
           sortedLongEssays,
           // 方法
           handleSend,
+          openCamera,
+          onPhotoTaken,
+          cancelOcrResult,
+          confirmOcrResult,
+          confirmVLResult,
+          cancelVLResult,
           switchMode,
+          switchTranslationSubMode,
           switchExamType,
           submitEssayForm,
+          submitLongEssayForm,
+          openEssayCamera,
+          onEssayPhotoTaken,
+          choosePostAnalysisAction,
+          submitGrading,
           toggleFolderDropdown,
           openNewFolderDialog,
           createFolder,
@@ -2458,10 +4393,14 @@ ${keywordLine}
           clearApiKeyConfirm,
           clearApiKey,
           testConnection,
+          openSettingsFromWelcome,
+          exportAllData,
+          clearAllData,
           cancelConfirm,
           executeConfirm,
           formatTime,
           hasExtensionContent,
+          countWords,
         };
       }
     }).mount('#app');
