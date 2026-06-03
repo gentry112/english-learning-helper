@@ -357,8 +357,33 @@
                 </div>
               </div>
 
-              <!-- 关键词引导 — 从考试配置读取 -->
-              <div class="mt-3 bg-gray-50 rounded-lg px-3 py-2.5 text-xs text-gray-500" v-html="keywordGuideText"></div>
+              <!-- 考研大作文：结构化图画/图表描述表单 -->
+              <div v-if="msg.type === 'long-essay-analysis' && msg.content.topicAnalysis" class="mt-3 space-y-2">
+                <!-- 图画作文表单 -->
+                <template v-if="msg.content.topicAnalysis.type && msg.content.topicAnalysis.type.includes('图画')">
+                  <div class="text-xs text-gray-500 mb-1">🎨 请描述图画内容，帮助 AI 更准确生成模板：</div>
+                  <input v-model="state.essayFormData.subjects" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="图中人物/主体（如：一对父子、一群学生）">
+                  <input v-model="state.essayFormData.action" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="他们在做什么（如：各看各的手机、围坐讨论）">
+                  <input v-model="state.essayFormData.meaning" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="反映什么寓意（如：手机依赖导致人际疏离）">
+                </template>
+                <!-- 图表作文表单 -->
+                <template v-else-if="msg.content.topicAnalysis.type && msg.content.topicAnalysis.type.includes('图表')">
+                  <div class="text-xs text-gray-500 mb-1">📊 请描述图表内容，帮助 AI 更准确生成模板：</div>
+                  <input v-model="state.essayFormData.chartType" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="图表类型（柱状图/饼图/折线图/表格）">
+                  <input v-model="state.essayFormData.chartTitle" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="图表标题/主题（如：2020-2025年网购人数变化）">
+                  <input v-model="state.essayFormData.dataPoints" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="关键数据（如：从3亿增至9亿，年增约20%）">
+                  <input v-model="state.essayFormData.trend" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="整体趋势（如：持续上升/先升后降/逐年稳定增长）">
+                  <input v-model="state.essayFormData.phenomenon" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="反映什么现象（如：网购已成为主流消费方式）">
+                </template>
+                <input v-model="state.essayFormData.extraKeywords" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-400" placeholder="额外关键词或句式（可选，用逗号分隔）">
+                <div class="flex gap-2">
+                  <button @click="submitEssayForm('detailed')" :disabled="state.isSending" class="flex-1 bg-green-500 text-white text-xs font-medium rounded-lg py-2 hover:bg-green-600 transition-colors disabled:opacity-50">📝 详细生成</button>
+                  <button @click="submitEssayForm('skip')" :disabled="state.isSending" class="flex-1 bg-gray-300 text-gray-600 text-xs font-medium rounded-lg py-2 hover:bg-gray-400 transition-colors disabled:opacity-50">跳过</button>
+                </div>
+              </div>
+
+              <!-- 其他作文模式：关键词引导 — 从考试配置读取 -->
+              <div v-else class="mt-3 bg-gray-50 rounded-lg px-3 py-2.5 text-xs text-gray-500" v-html="keywordGuideText"></div>
             </div>
           </div>
 
@@ -794,6 +819,12 @@
 
           // 作文两步交互上下文（统一用于所有 essay 模式）
           essayContext: null,           // { topic, analysis } | null
+          // 考研大作文结构化描述表单
+          essayFormData: {
+            subjects: '', children: '', action: '', meaning: '',  // 图画作文
+            chartType: '', chartTitle: '', dataPoints: '', trend: '', phenomenon: '',  // 图表作文
+            extraKeywords: ''
+          },
 
           showSettings: false,
           apiKey: '',
@@ -948,6 +979,7 @@
           // 清空旧消息
           state.messages = [];
           state.essayContext = null;
+          resetEssayFormData();
           state.inputText = '';
           addWelcomeMessage();
           scrollToBottom();
@@ -1155,6 +1187,7 @@
           if (state.currentMode === mode) return;
           state.currentMode = mode;
           state.essayContext = null;
+          resetEssayFormData();
           state.inputText = '';
           addWelcomeMessage();
           scrollToBottom();
@@ -1741,8 +1774,17 @@ ${keywordLine}
 建议结构：${analysis.structure || '描述图画→分析现象→阐述观点→总结'}`
             : '无题目解析';
 
-          const keywordLine = keywords
-            ? `用户希望使用以下关键词或句式：${keywords}。请尽量将这些融入模板中。`
+          // 分离结构化描述和普通关键词
+          let structDesc = '';
+          let normalKeywords = keywords || '';
+          const structMatch = (keywords || '').match(/【(图画|图表)描述】\n([\s\S]*?)(?=\n\n|$)/);
+          if (structMatch) {
+            structDesc = structMatch[0];
+            normalKeywords = (keywords || '').replace(structDesc, '').replace(/^\n+/, '').trim();
+          }
+
+          const keywordLine = normalKeywords
+            ? `用户希望使用以下关键词或句式：${normalKeywords}。请尽量将这些融入模板中。`
             : '用户未提供特定关键词，请自行选择适合该题目的词汇和句式。';
 
           return `你是一位专业的考研英语一大作文（图画/图表作文）教学专家。
@@ -1750,6 +1792,7 @@ ${keywordLine}
 
 【大作文题目/图画描述】
 ${topic}
+${structDesc ? '\n【用户提供的图画/图表详细描述，开头段必须基于此描述来写】\n' + structDesc : ''}
 
 【题目解析】
 ${analysisSummary}
@@ -1786,7 +1829,7 @@ ${keywordLine}
 
 注意：
 - 模板按段落结构组织（开头段描述图画、主体段分析现象/论证观点、结尾段总结升华，通常3-4段）
-- 开头段必须包含对图画的描述（As is vividly shown in the picture...），这是考研大作文的固定要求
+- 开头段必须包含对图画/图表的描述（As is vividly shown in the picture...），这是考研大作文的固定要求。如果用户提供了详细描述，开头段必须基于该描述来写，将描述中的中文信息转写为英文
 - 简单版使用基础词汇和句式，确保结构完整、逻辑清晰，容易拿到及格以上分数（大作文满分20分）
 - 进阶版使用复杂句式（非谓语、从句嵌套、强调倒装等）、精准高级词汇，体现语言功底
 - 用 [...] 标记需要学生根据具体内容替换的部分
@@ -1989,6 +2032,45 @@ ${keywordLine}
         }
 
         // ==================== 大作文发送（第二步：生成模板） ====================
+        // ==================== 考研大作文结构化表单提交 ====================
+        function buildStructuredDescription() {
+          const fd = state.essayFormData;
+          const ta = state.essayContext?.analysis;
+          const isPic = ta?.type && ta.type.includes('图画');
+
+          if (isPic) {
+            const parts = [];
+            if (fd.subjects) parts.push(`图中人物/主体：${fd.subjects}`);
+            if (fd.action) parts.push(`他们在做什么：${fd.action}`);
+            if (fd.meaning) parts.push(`反映的寓意：${fd.meaning}`);
+            return parts.length > 0 ? `【图画描述】\n${parts.join('\n')}` : '';
+          } else {
+            const parts = [];
+            if (fd.chartType) parts.push(`图表类型：${fd.chartType}`);
+            if (fd.chartTitle) parts.push(`图表标题：${fd.chartTitle}`);
+            if (fd.dataPoints) parts.push(`关键数据：${fd.dataPoints}`);
+            if (fd.trend) parts.push(`整体趋势：${fd.trend}`);
+            if (fd.phenomenon) parts.push(`反映的现象：${fd.phenomenon}`);
+            return parts.length > 0 ? `【图表描述】\n${parts.join('\n')}` : '';
+          }
+        }
+
+        function resetEssayFormData() {
+          Object.keys(state.essayFormData).forEach(k => { state.essayFormData[k] = ''; });
+        }
+
+        function submitEssayForm(mode) {
+          if (state.isSending) return;
+
+          const structuredDesc = mode === 'skip' ? '' : buildStructuredDescription();
+          const extraKeywords = state.essayFormData.extraKeywords || '';
+          const combinedKeywords = [structuredDesc, extraKeywords].filter(Boolean).join('\n\n');
+
+          state.isSending = true;
+          resetEssayFormData();
+          sendEssayWithKeywords(combinedKeywords || '');
+        }
+
         async function sendEssayWithKeywords(keywords) {
           const ctx = state.essayContext;
           if (!ctx) {
@@ -2360,6 +2442,7 @@ ${keywordLine}
           handleSend,
           switchMode,
           switchExamType,
+          submitEssayForm,
           toggleFolderDropdown,
           openNewFolderDialog,
           createFolder,
