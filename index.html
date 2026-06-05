@@ -1241,6 +1241,48 @@
       </div>
     </template>
 
+    <!-- ==================== 图片裁剪弹窗 ==================== -->
+    <template v-if="state.showCropper">
+      <div class="fixed inset-0 z-[55] bg-black flex flex-col">
+        <!-- 顶部栏 -->
+        <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-black/90">
+          <span class="text-white text-sm font-medium">✂️ 裁剪图片</span>
+          <button @click="cancelCrop()" class="text-white/70 hover:text-white text-lg leading-none px-1">✕</button>
+        </div>
+
+        <!-- 裁剪画布区域 -->
+        <div class="flex-1 relative overflow-hidden" id="cropContainer">
+          <canvas id="cropCanvas"
+            @touchstart.prevent="onCropTouchStart"
+            @touchmove.prevent="onCropTouchMove"
+            @touchend.prevent="onCropTouchEnd"
+            class="absolute inset-0">
+          </canvas>
+        </div>
+
+        <!-- 底部操作栏 -->
+        <div class="flex-shrink-0 bg-black/90 px-4 py-3">
+          <!-- 比例选择 -->
+          <div class="flex items-center gap-2 mb-3 justify-center">
+            <button v-for="opt in cropRatioOptions" :key="opt.value"
+              @click="setCropAspectRatio(opt.value)"
+              :class="['px-3 py-1.5 rounded-full text-xs font-medium transition-all',
+                state.cropAspectRatio === opt.value
+                  ? 'bg-wechat-green text-text-dark'
+                  : 'text-white/60 hover:text-white border border-white/20']">
+              {{ opt.label }}
+            </button>
+          </div>
+
+          <!-- 确认按钮 -->
+          <button @click="confirmCrop()"
+            class="w-full bg-wechat-green text-text-dark font-medium rounded-lg py-2.5 text-sm hover:opacity-80 transition-opacity active:scale-[0.98]">
+            确认裁剪
+          </button>
+        </div>
+      </div>
+    </template>
+
     <!-- 隐藏的拍照输入（调起后置摄像头） -->
     <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onPhotoTaken" />
     <input id="essayCameraInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onEssayPhotoTaken" />
@@ -1396,6 +1438,19 @@
 
           // 考研作文子模式：'short'（小作文，默认）| 'long'（大作文）
           essaySubMode: 'short',
+
+          // 图片裁剪器
+          showCropper: false,
+          cropperImage: null,
+          cropperSource: '',
+          cropperImg: null,
+          cropX: 0, cropY: 0, cropW: 200, cropH: 200,
+          cropAspectRatio: 0,
+          cropDragging: null,
+          cropStartX: 0, cropStartY: 0,
+          cropOrigBox: null,
+          cropImgLeft: 0, cropImgTop: 0,
+          cropImgDisplayW: 0, cropImgDisplayH: 0,
         });
 
         // ==================== 工具函数 ====================
@@ -1987,6 +2042,332 @@
           showToast('✅ 已填入输入框');
         }
 
+        // ==================== 图片裁剪器 ====================
+        const cropRatioOptions = [
+          { label: '自由', value: 0 },
+          { label: '1:1', value: 1 },
+          { label: '4:3', value: 4/3 },
+          { label: '3:4', value: 3/4 },
+          { label: '16:9', value: 16/9 },
+        ];
+
+        function openCropper(base64, source) {
+          state.cropperImage = base64;
+          state.cropperSource = source;
+          state.cropAspectRatio = 0;
+          state.showCropper = true;
+          nextTick(() => { initCropperCanvas(); });
+        }
+
+        function initCropperCanvas() {
+          const canvas = document.getElementById('cropCanvas');
+          const container = document.getElementById('cropContainer');
+          if (!canvas || !container) return;
+
+          const rect = container.getBoundingClientRect();
+          const dpr = window.devicePixelRatio || 1;
+          canvas.width = rect.width * dpr;
+          canvas.height = rect.height * dpr;
+          canvas.style.width = rect.width + 'px';
+          canvas.style.height = rect.height + 'px';
+
+          const img = new Image();
+          img.onload = () => {
+            state.cropperImg = img;
+            // 计算图片在画布上的显示区域（居中、留边距）
+            const padding = 16;
+            const cw = rect.width;
+            const ch = rect.height;
+            const availW = cw - padding * 2;
+            const availH = ch - padding * 2;
+            const scale = Math.min(availW / img.naturalWidth, availH / img.naturalHeight);
+            const displayW = img.naturalWidth * scale;
+            const displayH = img.naturalHeight * scale;
+            state.cropImgLeft = padding + (availW - displayW) / 2;
+            state.cropImgTop = padding + (availH - displayH) / 2;
+            state.cropImgDisplayW = displayW;
+            state.cropImgDisplayH = displayH;
+
+            // 默认裁剪框：覆盖图片 80% 区域，居中
+            const boxW = displayW * 0.8;
+            const boxH = displayH * 0.8;
+            state.cropX = state.cropImgLeft + (displayW - boxW) / 2;
+            state.cropY = state.cropImgTop + (displayH - boxH) / 2;
+            state.cropW = boxW;
+            state.cropH = boxH;
+            drawCropper();
+          };
+          img.onerror = () => {
+            showToast('图片加载失败，请重试', 'error');
+            state.showCropper = false;
+          };
+          img.src = state.cropperImage;
+        }
+
+        function drawCropper() {
+          const canvas = document.getElementById('cropCanvas');
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          const dpr = window.devicePixelRatio || 1;
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // 深色背景
+          ctx.fillStyle = '#111';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          const img = state.cropperImg;
+          if (!img) return;
+
+          const il = state.cropImgLeft, it = state.cropImgTop;
+          const iw = state.cropImgDisplayW, ih = state.cropImgDisplayH;
+          const cx = state.cropX, cy = state.cropY, cw = state.cropW, ch = state.cropH;
+
+          // 绘制图片（按 DPR 缩放）
+          ctx.drawImage(img, il * dpr, it * dpr, iw * dpr, ih * dpr);
+
+          // 裁剪框外的半透明遮罩（四块矩形拼合）
+          ctx.fillStyle = 'rgba(0,0,0,0.55)';
+          ctx.fillRect(0, 0, canvas.width, cy * dpr);                                          // 上方
+          ctx.fillRect(0, (cy + ch) * dpr, canvas.width, canvas.height - (cy + ch) * dpr);     // 下方
+          ctx.fillRect(0, cy * dpr, cx * dpr, ch * dpr);                                       // 左侧
+          ctx.fillRect((cx + cw) * dpr, cy * dpr, canvas.width - (cx + cw) * dpr, ch * dpr);   // 右侧
+
+          // 裁剪框白色边框
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2 * dpr;
+          ctx.strokeRect(cx * dpr, cy * dpr, cw * dpr, ch * dpr);
+
+          // 九宫格辅助线
+          ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+          ctx.lineWidth = 1 * dpr;
+          for (let i = 1; i < 3; i++) {
+            const gx = (cx + cw * i / 3) * dpr;
+            const gy = (cy + ch * i / 3) * dpr;
+            ctx.beginPath(); ctx.moveTo(gx, cy * dpr); ctx.lineTo(gx, (cy + ch) * dpr); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx * dpr, gy); ctx.lineTo((cx + cw) * dpr, gy); ctx.stroke();
+          }
+
+          // 四角拖拽手柄（白色方块带边框）
+          const hs = 14 * dpr;
+          const corners = [
+            { x: cx * dpr, y: cy * dpr },
+            { x: (cx + cw) * dpr, y: cy * dpr },
+            { x: cx * dpr, y: (cy + ch) * dpr },
+            { x: (cx + cw) * dpr, y: (cy + ch) * dpr },
+          ];
+          corners.forEach(c => {
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+            ctx.lineWidth = 1.5 * dpr;
+            ctx.fillRect(c.x - hs/2, c.y - hs/2, hs, hs);
+            ctx.strokeRect(c.x - hs/2, c.y - hs/2, hs, hs);
+          });
+        }
+
+        function getCropTouchPos(e) {
+          const canvas = document.getElementById('cropCanvas');
+          if (!canvas) return { x: 0, y: 0 };
+          const rect = canvas.getBoundingClientRect();
+          const touch = e.touches[0];
+          return {
+            x: touch.clientX - rect.left,
+            y: touch.clientY - rect.top
+          };
+        }
+
+        function findCropHandle(tx, ty) {
+          const threshold = 30;
+          const { cropX, cropY, cropW, cropH } = state;
+          const handles = [
+            { name: 'nw', x: cropX, y: cropY },
+            { name: 'ne', x: cropX + cropW, y: cropY },
+            { name: 'sw', x: cropX, y: cropY + cropH },
+            { name: 'se', x: cropX + cropW, y: cropY + cropH },
+          ];
+          for (const h of handles) {
+            if (Math.abs(tx - h.x) < threshold && Math.abs(ty - h.y) < threshold) return h.name;
+          }
+          if (tx >= cropX && tx <= cropX + cropW && ty >= cropY && ty <= cropY + cropH) return 'move';
+          return null;
+        }
+
+        function onCropTouchStart(e) {
+          if (!e.touches || e.touches.length === 0) return;
+          const pos = getCropTouchPos(e);
+          const handle = findCropHandle(pos.x, pos.y);
+          if (!handle) return;
+
+          state.cropDragging = handle;
+          state.cropStartX = pos.x;
+          state.cropStartY = pos.y;
+          state.cropOrigBox = { x: state.cropX, y: state.cropY, w: state.cropW, h: state.cropH };
+        }
+
+        function clampCropBox(nx, ny, nw, nh) {
+          const minSize = 50;
+          const il = state.cropImgLeft, it = state.cropImgTop;
+          const ir = il + state.cropImgDisplayW, ib = it + state.cropImgDisplayH;
+
+          if (nw < minSize) nw = minSize;
+          if (nh < minSize) nh = minSize;
+          nx = Math.max(il, Math.min(nx, ir - minSize));
+          ny = Math.max(it, Math.min(ny, ib - minSize));
+          if (nx + nw > ir) nw = ir - nx;
+          if (ny + nh > ib) nh = ib - ny;
+          return { nx, ny, nw, nh };
+        }
+
+        function applyAspectRatio(nx, ny, nw, nh, orig, handle, ratio) {
+          if (ratio <= 0) return { nx, ny, nw, nh };
+
+          const wChange = orig.w > 0 ? Math.abs(nw / orig.w - 1) : 0;
+          const hChange = orig.h > 0 ? Math.abs(nh / orig.h - 1) : 0;
+
+          if (wChange >= hChange) {
+            nh = nw / ratio;
+            if (handle === 'nw' || handle === 'ne') ny = orig.y + orig.h - nh;
+          } else {
+            nw = nh * ratio;
+            if (handle === 'nw' || handle === 'sw') nx = orig.x + orig.w - nw;
+          }
+          return { nx, ny, nw, nh };
+        }
+
+        function onCropTouchMove(e) {
+          if (!state.cropDragging || !e.touches || e.touches.length === 0) return;
+          const pos = getCropTouchPos(e);
+          const dx = pos.x - state.cropStartX;
+          const dy = pos.y - state.cropStartY;
+          const orig = state.cropOrigBox;
+          if (!orig) return;
+
+          let nx = orig.x, ny = orig.y, nw = orig.w, nh = orig.h;
+          const handle = state.cropDragging;
+
+          if (handle === 'nw')      { nx = orig.x + dx; ny = orig.y + dy; nw = orig.w - dx; nh = orig.h - dy; }
+          else if (handle === 'ne') { ny = orig.y + dy; nw = orig.w + dx; nh = orig.h - dy; }
+          else if (handle === 'sw') { nx = orig.x + dx; nw = orig.w - dx; nh = orig.h + dy; }
+          else if (handle === 'se') { nw = orig.w + dx; nh = orig.h + dy; }
+          else if (handle === 'move') { nx = orig.x + dx; ny = orig.y + dy; }
+
+          // 锁定宽高比
+          const adjusted = applyAspectRatio(nx, ny, nw, nh, orig, handle, state.cropAspectRatio);
+          nx = adjusted.nx; ny = adjusted.ny; nw = adjusted.nw; nh = adjusted.nh;
+
+          // 限制在图片范围内
+          const clamped = clampCropBox(nx, ny, nw, nh);
+          state.cropX = clamped.nx; state.cropY = clamped.ny;
+          state.cropW = clamped.nw; state.cropH = clamped.nh;
+
+          requestAnimationFrame(() => drawCropper());
+        }
+
+        function onCropTouchEnd(e) {
+          state.cropDragging = null;
+          state.cropStartX = 0; state.cropStartY = 0;
+          state.cropOrigBox = null;
+        }
+
+        function setCropAspectRatio(ratio) {
+          // 点击已选中的比例则取消锁定
+          state.cropAspectRatio = state.cropAspectRatio === ratio ? 0 : ratio;
+          if (state.cropAspectRatio > 0) {
+            // 立即按比例调整当前裁剪框高度
+            const targetH = state.cropW / state.cropAspectRatio;
+            const ib = state.cropImgTop + state.cropImgDisplayH;
+            if (state.cropY + targetH > ib) {
+              state.cropH = ib - state.cropY;
+              state.cropW = state.cropH * state.cropAspectRatio;
+            } else {
+              state.cropH = targetH;
+            }
+          }
+          drawCropper();
+        }
+
+        function confirmCrop() {
+          const img = state.cropperImg;
+          if (!img) return;
+
+          const il = state.cropImgLeft, it = state.cropImgTop;
+          const iw = state.cropImgDisplayW, ih = state.cropImgDisplayH;
+          const cx = state.cropX, cy = state.cropY, cw = state.cropW, ch = state.cropH;
+
+          // 将画布坐标映射回原始图片坐标
+          const scaleX = img.naturalWidth / iw;
+          const scaleY = img.naturalHeight / ih;
+          const srcX = Math.max(0, Math.round((cx - il) * scaleX));
+          const srcY = Math.max(0, Math.round((cy - it) * scaleY));
+          const srcW = Math.min(img.naturalWidth - srcX, Math.round(cw * scaleX));
+          const srcH = Math.min(img.naturalHeight - srcY, Math.round(ch * scaleY));
+
+          if (srcW < 10 || srcH < 10) {
+            showToast('裁剪区域太小，请重新选择', 'error');
+            return;
+          }
+
+          // 创建裁剪画布
+          const cropCanvas = document.createElement('canvas');
+          let dstW = srcW, dstH = srcH;
+          const MAX_SIZE = 1024;
+          if (Math.max(dstW, dstH) > MAX_SIZE) {
+            const s = MAX_SIZE / Math.max(dstW, dstH);
+            dstW = Math.round(dstW * s);
+            dstH = Math.round(dstH * s);
+          }
+
+          cropCanvas.width = dstW;
+          cropCanvas.height = dstH;
+          const cropCtx = cropCanvas.getContext('2d');
+          cropCtx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, dstW, dstH);
+
+          const resultBase64 = cropCanvas.toDataURL('image/jpeg', 0.85);
+          state.showCropper = false;
+
+          // 继续走原有的识别流程
+          continueAfterCrop(resultBase64);
+        }
+
+        function cancelCrop() {
+          state.showCropper = false;
+          state.cropperImage = null;
+          state.cropperImg = null;
+          state.cropperSource = '';
+          showToast('已取消');
+        }
+
+        async function continueAfterCrop(base64) {
+          const source = state.cropperSource;
+          state.isOcrProcessing = true;
+
+          try {
+            if (source === 'ocr') {
+              const text = await ocrImage(base64);
+              if (text) {
+                state.ocrResultText = text;
+                state.showOcrResult = true;
+              } else {
+                showToast('未识别到文字，请重试', 'error');
+              }
+            } else if (source === 'essay') {
+              const prompt = buildVLImagePrompt();
+              const text = await analyzeImage(base64, prompt);
+              if (text) {
+                state.vlResultRaw = text;
+                state.showVLResult = true;
+              } else {
+                showToast('未识别到内容，请重试', 'error');
+              }
+            }
+          } catch (err) {
+            showToast(err.message || '识别失败，请重试', 'error');
+          } finally {
+            state.isOcrProcessing = false;
+          }
+        }
+
+        // ==================== 拍照 OCR 识别（通义千问 VL） ====================
         async function onPhotoTaken(event) {
           const file = event.target.files?.[0];
           if (!file) return;
@@ -1995,18 +2376,13 @@
 
           try {
             const base64 = await compressImage(file);
-            const text = await ocrImage(base64);
-            if (text) {
-              state.ocrResultText = text;
-              state.showOcrResult = true;
-            } else {
-              showToast('未识别到文字，请重试', 'error');
-            }
-          } catch (err) {
-            showToast(err.message || '识别失败，请重试', 'error');
-          } finally {
             state.isOcrProcessing = false;
             event.target.value = '';
+            openCropper(base64, 'ocr');
+          } catch (err) {
+            state.isOcrProcessing = false;
+            event.target.value = '';
+            showToast(err.message || '图片处理失败，请重试', 'error');
           }
         }
 
@@ -2116,19 +2492,13 @@
           state.isOcrProcessing = true;
           try {
             const base64 = await compressImage(file);
-            const prompt = buildVLImagePrompt();
-            const text = await analyzeImage(base64, prompt);
-            if (text) {
-              state.vlResultRaw = text;
-              state.showVLResult = true;
-            } else {
-              showToast('未识别到内容，请重试', 'error');
-            }
-          } catch (err) {
-            showToast(err.message || '识别失败，请重试', 'error');
-          } finally {
             state.isOcrProcessing = false;
             event.target.value = '';
+            openCropper(base64, 'essay');
+          } catch (err) {
+            state.isOcrProcessing = false;
+            event.target.value = '';
+            showToast(err.message || '图片处理失败，请重试', 'error');
           }
         }
 
@@ -4534,6 +4904,14 @@ ${keywordLine}
           formatTime,
           hasExtensionContent,
           countWords,
+          // 裁剪器
+          cropRatioOptions,
+          onCropTouchStart,
+          onCropTouchMove,
+          onCropTouchEnd,
+          setCropAspectRatio,
+          confirmCrop,
+          cancelCrop,
         };
       }
     }).mount('#app');
